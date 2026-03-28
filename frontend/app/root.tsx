@@ -37,8 +37,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body className="h-full flex flex-col">
         <ThemeProvider defaultTheme="dark">
           <Navbar />
-          {children}
+          <main className="flex-1">{children}</main>
           <ScrollRestoration />
+          <footer>
+            <div className="container mx-auto py-4 text-center text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} SICC Project. <a href="https://github.com/iwonieevo/sicc-project" target="_blank" rel="noopener noreferrer" className="underline">View repo</a>
+            </div>
+          </footer>
           <Scripts />
         </ThemeProvider>
       </body>

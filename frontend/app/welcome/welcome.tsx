@@ -12,12 +12,10 @@ export function Welcome() {
         </header>
         <div className="max-w-[300px] w-full space-x-2 px-4 flex items-center justify-center">
           <Button variant="default" size="lg" asChild className="mb-0">
-            <Link to="/login">Sign in</Link>
+            <Link to="/signup">Create new account</Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <a href="https://github.com/iwonieevo/sicc-project" target="_blank">
-              View repo
-            </a>
+            <Link to="/login">Sign in</Link>
           </Button>
         </div>
       </div>

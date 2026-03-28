@@ -11,7 +11,11 @@ import {
 export function Navbar() {
     return (
         <header className="flex-0 flex items-center justify-between p-4">
-            <span className="font-bold">SICC</span>
+            <span className="font-bold">
+                <Link to="/">
+                    SICC
+                </Link>
+            </span>
             <NavigationMenu>
                 <NavigationMenuList>
                     <NavigationMenuItem>
