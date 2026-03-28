@@ -1,13 +1,11 @@
-import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
+import { LoginForm } from "~/components/login-form"
 
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Sign in | SICC" },
-    { name: "description", content: "Sign in to SICC project" },
-  ];
-}
-
-export default function Login() {
-  return <div className="flex items-center justify-center pt-16 pb-4">Sign in to SICC</div>;
+export default function Page() {
+  return (
+    <div className="flex-1 flex w-full items-center justify-center p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <LoginForm />
+      </div>
+    </div>
+  )
 }
