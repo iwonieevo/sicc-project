@@ -1,3 +1,10 @@
+"use client"
+
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+
 import { cn } from "~/lib/utils"
 import { Button } from "~/components/ui/button"
 import {
@@ -15,10 +22,57 @@ import {
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
 
+// 1. Define the validation schema
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+})
+
+// 2. Extract the type from the schema
+type LoginFormValues = z.infer<typeof loginSchema>
+
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  // 3. Initialize the form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  })
+
+  // 4. Handle form submission
+  const onSubmit = async (data: LoginFormValues) => {
+    setServerError(null)
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || "Something went wrong")
+      }
+
+      // Handle success (e.g., redirect or update auth state)
+      console.log("Login successful:", result)
+    } catch (error: any) {
+      setServerError(error.message)
+    }
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -29,36 +83,59 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={handleSubmit(onSubmit)}>
             <FieldGroup>
+              {/* Email Field */}
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
+                  {...register("email")}
                   id="email"
                   type="email"
                   placeholder="m@example.com"
-                  required
+                  disabled={isSubmitting}
                 />
+                {errors.email && (
+                  <p className="text-sm font-medium text-destructive">{errors.email.message}</p>
+                )}
               </Field>
+
+              {/* Password Field */}
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
-                  {/* <a
+                  <a
                     href="#"
                     className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                   >
                     Forgot your password?
-                  </a> */}
+                  </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input 
+                  {...register("password")} 
+                  id="password" 
+                  type="password" 
+                  disabled={isSubmitting}
+                />
+                {errors.password && (
+                  <p className="text-sm font-medium text-destructive">{errors.password.message}</p>
+                )}
               </Field>
+
+              {/* Server-side Error Display */}
+              {serverError && (
+                <p className="text-sm text-center font-medium text-destructive">
+                  {serverError}
+                </p>
+              )}
+
               <Field>
-                <Button type="submit">Login</Button>
-                {/* <Button variant="outline" type="button">
-                  Login with Google
-                </Button> */}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Logging in..." : "Login"}
+                </Button>
+                
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
+                  Don&apos;t have an account? <a href="#" className="underline">Sign up</a>
                 </FieldDescription>
               </Field>
             </FieldGroup>
