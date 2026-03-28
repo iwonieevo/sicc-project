@@ -21,6 +21,7 @@ import {
   FieldLabel,
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
+import { Link } from "react-router"
 
 // 1. Define the validation schema
 const loginSchema = z.object({
@@ -135,7 +136,9 @@ export function LoginForm({
                 </Button>
                 
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#" className="underline">Sign up</a>
+                  Don&apos;t have an account? <Link to="/signup" className="underline">
+                    Sign up
+                  </Link>
                 </FieldDescription>
               </Field>
             </FieldGroup>
