@@ -1,0 +1,1 @@
+#tu bedzie lista zależności dla projektu backendowego. Możesz dodać tutaj wszystkie potrzebne biblioteki, które są wymagane do uruchomienia i działania Twojej aplikacji. Na przykład:
