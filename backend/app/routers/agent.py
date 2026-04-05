@@ -1,1 +1,0 @@
-#endpointy uzywane przez agentow na rasberyPi

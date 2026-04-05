@@ -1,1 +1,0 @@
-#ednpointy do rasberkow, z ktorej korzysta fronend

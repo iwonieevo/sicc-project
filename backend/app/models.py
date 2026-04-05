@@ -1,1 +1,0 @@
-#modele bazy danych, klasy opisujace jakie tabele sa w systemie, jak sa zapisane w bazie
