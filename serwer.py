@@ -1,9 +1,3 @@
-#Glowny plik uruchamiajacy backend
-#Aplikacja FastAPI
-#Konfiguracja apikacji
-#Polaczenie z fronendem (add CORS)
-
-
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi import HTTPException

@@ -1,1 +1,7 @@
-#tu bedzie lista zależności dla projektu backendowego. Możesz dodać tutaj wszystkie potrzebne biblioteki, które są wymagane do uruchomienia i działania Twojej aplikacji. Na przykład:
+fastapi
+uvicorn
+python-jose[cryptography]
+passlib[bcrypt]==1.7.4
+bcrypt==4.3.0
+python-multipart
+email-validator
