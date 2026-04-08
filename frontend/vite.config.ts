@@ -5,4 +5,12 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  server: {
+    watch: {
+      usePolling: true,
+    },
+    host: true, // needed for the Docker port mapping
+    strictPort: true,
+    port: 3000,
+  }
 });
