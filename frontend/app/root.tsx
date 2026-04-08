@@ -11,6 +11,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "./components/navbar";
 import { ThemeProvider } from "./components/theme-provider";
+import { AuthProvider } from "./providers/AuthProvider";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -35,17 +36,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="h-full flex flex-col">
-        <ThemeProvider defaultTheme="dark">
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <ScrollRestoration />
-          <footer>
-            <div className="container mx-auto py-4 text-center text-xs text-muted-foreground">
-              &copy; {new Date().getFullYear()} SICC Project. <a href="https://github.com/iwonieevo/sicc-project" target="_blank" rel="noopener noreferrer" className="underline">View repo</a>
-            </div>
-          </footer>
-          <Scripts />
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider defaultTheme="dark">
+            <Navbar />
+            <main className="flex-1">
+              <Outlet />
+            </main>
+            <ScrollRestoration />
+            <footer>
+              <div className="container mx-auto py-4 text-center text-xs text-muted-foreground">
+                &copy; {new Date().getFullYear()} SICC Project. <a href="https://github.com/iwonieevo/sicc-project" target="_blank" rel="noopener noreferrer" className="underline">View repo</a>
+              </div>
+            </footer>
+            <Scripts />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

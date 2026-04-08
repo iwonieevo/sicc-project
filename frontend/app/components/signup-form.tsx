@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
 
 import { Button } from "~/components/ui/button"
 import {
@@ -38,6 +38,8 @@ type SignupFormValues = z.infer<typeof signupSchema>
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const [serverError, setServerError] = useState<string | null>(null)
 
+  const navigate = useNavigate()
+
   const {
     register,
     handleSubmit,
@@ -69,6 +71,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 
       // Handle success (e.g., redirect to dashboard or login)
       console.log("Account created:", data)
+      navigate("/login")
     } catch (err: any) {
       setServerError(err.message)
     }

@@ -21,7 +21,8 @@ import {
   FieldLabel,
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
+import { useAuth } from "~/providers/AuthProvider"
 
 // 1. Define the validation schema
 const loginSchema = z.object({
@@ -37,6 +38,8 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const [serverError, setServerError] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const { login } = useAuth()
 
   // 3. Initialize the form
   const {
@@ -57,6 +60,7 @@ export function LoginForm({
     try {
       const response = await fetch("/api/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
@@ -69,6 +73,8 @@ export function LoginForm({
 
       // Handle success (e.g., redirect or update auth state)
       console.log("Login successful:", result)
+      login(result.access_token) // TODO: change to user data when backend is ready
+      navigate("/")
     } catch (error: any) {
       setServerError(error.message)
     }
