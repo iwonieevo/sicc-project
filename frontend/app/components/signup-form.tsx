@@ -64,7 +64,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to create account")
+        throw new Error(data.detail || "Failed to create account")
       }
 
       // Handle success (e.g., redirect to dashboard or login)
@@ -158,7 +158,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? "Creating account..." : "Create Account"}
                 </Button>
-                
+
                 <FieldDescription className="px-6 text-center">
                   Already have an account?{" "}
                   <Link to="/login" className="underline underline-offset-4">

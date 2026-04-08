@@ -9,6 +9,12 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000', // Use the Docker service name 'backend'
+        changeOrigin: true,
+      }
+    },
     host: true, // needed for the Docker port mapping
     strictPort: true,
     port: 3000,

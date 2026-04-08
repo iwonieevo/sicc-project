@@ -64,7 +64,7 @@ export function LoginForm({
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.message || "Something went wrong")
+        throw new Error(result.detail || "Something went wrong")
       }
 
       // Handle success (e.g., redirect or update auth state)
@@ -112,10 +112,10 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
-                <Input 
-                  {...register("password")} 
-                  id="password" 
-                  type="password" 
+                <Input
+                  {...register("password")}
+                  id="password"
+                  type="password"
                   disabled={isSubmitting}
                 />
                 {errors.password && (
@@ -134,7 +134,7 @@ export function LoginForm({
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
-                
+
                 <FieldDescription className="text-center">
                   Don&apos;t have an account? <Link to="/signup" className="underline">
                     Sign up
