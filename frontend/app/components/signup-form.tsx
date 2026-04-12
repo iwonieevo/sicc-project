@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
 
 import { Button } from "~/components/ui/button"
 import {
@@ -38,6 +38,8 @@ type SignupFormValues = z.infer<typeof signupSchema>
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const [serverError, setServerError] = useState<string | null>(null)
 
+  const navigate = useNavigate()
+
   const {
     register,
     handleSubmit,
@@ -64,11 +66,12 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to create account")
+        throw new Error(data.detail || "Failed to create account")
       }
 
       // Handle success (e.g., redirect to dashboard or login)
       console.log("Account created:", data)
+      navigate("/login")
     } catch (err: any) {
       setServerError(err.message)
     }
@@ -158,7 +161,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? "Creating account..." : "Create Account"}
                 </Button>
-                
+
                 <FieldDescription className="px-6 text-center">
                   Already have an account?{" "}
                   <Link to="/login" className="underline underline-offset-4">

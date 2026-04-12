@@ -21,7 +21,8 @@ import {
   FieldLabel,
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
+import { useAuth } from "~/providers/AuthProvider"
 
 // 1. Define the validation schema
 const loginSchema = z.object({
@@ -37,6 +38,8 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const [serverError, setServerError] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const { login } = useAuth()
 
   // 3. Initialize the form
   const {
@@ -57,6 +60,7 @@ export function LoginForm({
     try {
       const response = await fetch("/api/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
@@ -64,11 +68,13 @@ export function LoginForm({
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.message || "Something went wrong")
+        throw new Error(result.detail || "Something went wrong")
       }
 
       // Handle success (e.g., redirect or update auth state)
       console.log("Login successful:", result)
+      login(result.access_token) // TODO: change to user data when backend is ready
+      navigate("/")
     } catch (error: any) {
       setServerError(error.message)
     }
@@ -112,10 +118,10 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
-                <Input 
-                  {...register("password")} 
-                  id="password" 
-                  type="password" 
+                <Input
+                  {...register("password")}
+                  id="password"
+                  type="password"
                   disabled={isSubmitting}
                 />
                 {errors.password && (
@@ -134,7 +140,7 @@ export function LoginForm({
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
-                
+
                 <FieldDescription className="text-center">
                   Don&apos;t have an account? <Link to="/signup" className="underline">
                     Sign up
