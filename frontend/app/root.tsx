@@ -9,7 +9,9 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { Navbar } from "./components/navbar/navbar";
+import { Navbar } from "./components/navbar";
+import { ThemeProvider } from "./components/theme-provider";
+import { AuthProvider } from "./providers/AuthProvider";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -26,18 +28,29 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full dark">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body>
-        <Navbar />
-        {children}
-        <ScrollRestoration />
-        <Scripts />
+      <body className="h-full flex flex-col">
+        <AuthProvider>
+          <ThemeProvider defaultTheme="dark">
+            <Navbar />
+            <main className="flex-1">
+              <Outlet />
+            </main>
+            <ScrollRestoration />
+            <footer>
+              <div className="container mx-auto py-4 text-center text-xs text-muted-foreground">
+                &copy; {new Date().getFullYear()} SICC Project. <a href="https://github.com/iwonieevo/sicc-project" target="_blank" rel="noopener noreferrer" className="underline">View repo</a>
+              </div>
+            </footer>
+            <Scripts />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
