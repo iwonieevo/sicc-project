@@ -10,7 +10,7 @@ import {
 import { useAuth } from "~/providers/AuthProvider"
 
 export function Navbar() {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     return (
         <header className="flex-0 flex items-center justify-between p-4">
             <span className="font-bold">

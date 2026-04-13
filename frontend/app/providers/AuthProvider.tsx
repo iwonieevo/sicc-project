@@ -2,12 +2,14 @@ import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { Outlet, useNavigate } from "react-router";
 
 interface AuthContextType {
+    loading: boolean;
     user: String | null;
     login: (data: string) => Promise<void>;
     logout: () => void;
 }
 
 const defaultValue: AuthContextType = {
+    loading: true,
     user: null, // TODO: for now, it's access token, but it will be user data when backend is ready
     login: async () => { },
     logout: () => { }
@@ -18,19 +20,24 @@ export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState(defaultValue.user);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetch("/api/me", {
             credentials: "include",
+            headers: {
+                authorization: "Bearer " + localStorage.getItem("accessToken"), // TODO: for now, it's access token, but it will be removed when backend is ready
+            },
         })
             .then((res) => res.json())
             .then((data) => {
-                if (data.user) {
-                    setUser(data.user);
-                }
+                setUser(localStorage.getItem("accessToken"));
+                setLoading(false);
             })
             .catch((err) => {
+                localStorage.removeItem("accessToken")
                 console.error("Failed to fetch user:", err);
+                setLoading(false);
             });
     }, []);
 
@@ -50,8 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             navigate("/login", { replace: true });
         };
 
-        return { user, login, logout };
-    }, [user, navigate, setUser]);
+        return { user, login, logout, loading };
+    }, [user, navigate, setUser, loading]);
 
     return (
         <AuthContext value={value}>

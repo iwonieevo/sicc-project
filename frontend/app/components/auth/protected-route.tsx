@@ -3,10 +3,15 @@ import { useNavigate, Outlet, Navigate } from "react-router";
 import { useAuth } from "../../providers/AuthProvider";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const data = useAuth();
+    const { user, loading } = useAuth();
 
-    if (!data?.user) {
+    if (loading) {
+        return <div>Loading...</div>;
+    }
+
+    if (!user) {
         return <Navigate to="/login" replace />;
     }
+
     return <Outlet />;
 };
