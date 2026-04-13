@@ -43,6 +43,11 @@ export function Navbar() {
                         <>
                             <NavigationMenuItem>
                                 <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                                    <Link to="/dashboard">Dashboard</Link>
+                                </NavigationMenuLink>
+                            </NavigationMenuItem>
+                            <NavigationMenuItem>
+                                <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
                                     <Link to="/me">Profile</Link>
                                 </NavigationMenuLink>
                             </NavigationMenuItem>

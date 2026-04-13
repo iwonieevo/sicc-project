@@ -1,4 +1,4 @@
-import { type RouteConfig, index, route, layout } from "@react-router/dev/routes";
+import { type RouteConfig, index, route, layout, prefix } from "@react-router/dev/routes";
 
 export default [
     index("routes/home.tsx"),
@@ -8,5 +8,13 @@ export default [
     ]),
     layout("./components/auth/protected-route.tsx", [
         route("me", "routes/me.tsx"),
+        layout("./components/dashboard/_layout.tsx", [
+            ...prefix("dashboard", [
+                index("routes/dashboard/home.tsx"),
+                route("logs", "routes/dashboard/logs.tsx"),
+                route("simple-message", "routes/dashboard/simple-message.tsx"),
+            ]),
+        ]),
     ]),
+
 ] satisfies RouteConfig;
