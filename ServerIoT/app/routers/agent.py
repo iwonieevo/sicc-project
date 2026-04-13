@@ -38,7 +38,7 @@ def mark_done(command_id: int, data: CommandResult):
 
     raise HTTPException(status_code=404, detail="Command not found")    # Obsługa błędu – brak komendy o podanym ID
 
-
+# Funckja odpowiadająca za wysyłanie danych do aplikacji
 def send_result_to_web_server(command):
     web_server_url = "http://127.0.0.1:7000/api/result"  
 
