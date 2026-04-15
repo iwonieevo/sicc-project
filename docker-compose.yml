@@ -7,6 +7,17 @@ services:
       - ./backend:/app
     environment:
       - ENV=development
+      - IOT_SERVER_URL=http://iot-server:7000
+  iot-server:
+    build: ./ServerIoT
+    ports:
+      - "7000:7000"
+    volumes:
+      - ./ServerIoT:/app
+    environment:
+      - ENV=development
+      - BACKEND_URL=http://backend:8000
+      - AGENT_URL=http://agent:9000
   frontend:
     build: ./frontend
     ports:
