@@ -40,7 +40,7 @@ def mark_done(command_id: int, data: CommandResult):
 
 # Funckja odpowiadająca za wysyłanie danych do aplikacji
 def send_result_to_web_server(command):
-    web_server_url = "http://127.0.0.1:7000/api/result"  
+    web_server_url = "http://127.0.0.1:8000/api/result"  #Zmiana z 7000 na 8000
 
     payload = {
         "command_id": command["command_id"],
