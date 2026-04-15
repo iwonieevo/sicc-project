@@ -13,7 +13,7 @@ class CommandRequest(BaseModel):
     # device_id – identyfikator urządzenia
     # command – komenda w postaci stringa (np. kod do wykonania)
 
-    device_id: int
+    device_id: str #zmiana na str z int
     command: str
 
 @router.post("/commands")
