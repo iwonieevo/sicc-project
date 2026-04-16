@@ -1,6 +1,9 @@
+import os
 import requests
 from fastapi import APIRouter, HTTPException
 from app.schemas import ResultRequest, SimpleMessageRequest
+
+IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://localhost:7000")
 
 router = APIRouter(prefix="/api", tags=["commands"])
 
@@ -12,7 +15,7 @@ def send_to_server(agent_id: str, message: str):
         "command": message
     }
 
-    response = requests.post("http://localhost:7000/commands", json=payload, timeout=5)
+    response = requests.post(f"{IOT_SERVER_URL}/commands", json=payload, timeout=5)
     response.raise_for_status()
 
     return response.json()
