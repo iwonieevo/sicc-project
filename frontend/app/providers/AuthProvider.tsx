@@ -29,12 +29,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 authorization: "Bearer " + localStorage.getItem("accessToken"), // TODO: for now, it's access token, but it will be removed when backend is ready
             },
         })
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error("Failed to fetch user");
+                }
+                return res.json()
+            })
             .then((data) => {
+                console.log("Fetched user data:", data);
                 setUser(localStorage.getItem("accessToken"));
                 setLoading(false);
             })
             .catch((err) => {
+                console.log("errr");
                 localStorage.removeItem("accessToken")
                 console.error("Failed to fetch user:", err);
                 setLoading(false);
