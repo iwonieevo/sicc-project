@@ -3,7 +3,6 @@ from fastapi import APIRouter
 router = APIRouter()
 
 devices = [
-    {"device_id": 0, "name": "RasberryPi", "status": "online", "last_seen" : None},
     {"device_id": 1, "name": "RasberryPi", "status": "offline", "last_seen" : None},
     {"device_id": 2, "name": "RasberryPi", "status": "offline", "last_seen" : None}
 ]

@@ -1,10 +1,9 @@
-import requests, time
+import requests
+import time
+import os
 
-SERVER = "http://127.0.0.1:7000"  # zmień adres na 7000
-DEVICE = 0                        # zmień ID
-
-#SERVER = "http://host.docker.internal:8000"  # możliwe że trzeba tak jeśli uruchamiami w Dockerze na Windows/Mac
-
+SERVER = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
+DEVICE = os.getenv("AGENT_ID", -1)
 
 
 while True:

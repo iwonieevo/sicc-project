@@ -11,7 +11,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://backend:8000', // Use the Docker service name 'backend'
+        target: process.env.BACKEND_URL ?? 'http://backend:8000', // Use the Docker service name 'backend'
         changeOrigin: true,
       }
     },

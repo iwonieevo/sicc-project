@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException
 from app.routers.commands import commands
 from pydantic import BaseModel
 import requests
+import os
 
 router = APIRouter()
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
 
 # Model danych odbieranych od agenta
 # result – wynik wykonania komendy w postaci stringa
@@ -40,7 +42,7 @@ def mark_done(command_id: int, data: CommandResult):
 
 # Funckja odpowiadająca za wysyłanie danych do aplikacji
 def send_result_to_web_server(command):
-    web_server_url = "http://127.0.0.1:8000/api/result"  #Zmiana z 7000 na 8000
+    backend_api_url = BACKEND_URL + "/api/result"
 
     payload = {
         "command_id": command["command_id"],
@@ -50,6 +52,6 @@ def send_result_to_web_server(command):
     }
 
     try:
-        requests.post(web_server_url, json=payload)
+        requests.post(backend_api_url, json=payload)
     except Exception as e:
         print("Błąd wysyłania wyniku do aplikacji:", e)
