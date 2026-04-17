@@ -4,3 +4,5 @@ __pycache__
 .env
 .env.*
 .git
+*.log
+.DS_Store

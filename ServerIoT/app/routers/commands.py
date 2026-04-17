@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import requests
+import os
 
 router = APIRouter()
 
@@ -8,26 +9,24 @@ router = APIRouter()
 commands = []
 
 class CommandRequest(BaseModel):
-
     # Model danych przyjmowanych od backendu aplikacji
     # device_id – identyfikator urządzenia
     # command – komenda w postaci stringa (np. kod do wykonania)
 
-    device_id: str #zmiana na str z int
+    device_id: str  # zmiana na str z int
     command: str
 
 @router.post("/commands")
 def create_command(data: CommandRequest):
-    
     # Endpoint służący do tworzenia nowej komendy dla urządzenia
     # Odbiera dane od backendu aplikacji
 
     new_command = {
-        "command_id" : len(commands), # unikalny identyfikator komendy
-        "device_id" : data.device_id, # urządzenie docelowe
-        "command" : data.command,     # treść komendy
-        "status" : "pending",         # status początkowy
-        "result" : None               # wynik wykonania 
+        "command_id": len(commands),  # unikalny identyfikator komendy
+        "device_id": data.device_id,  # urządzenie docelowe
+        "command": data.command,      # treść komendy
+        "status": "pending",          # status początkowy
+        "result": None                # wynik wykonania
     }
 
     commands.append(new_command)      # Dodanie komendy do listy przechowywanej w pamięci serwera
@@ -43,14 +42,13 @@ def get_commands():
 
 # Funkcja odpowiedzialna za wysłanie komendy do agenta przez HTTP
 def send_to_agent(command):
-    agent_url = "http://127.0.0.1:9000/execute"  # Adres agenta
+    AGENT_PORT = os.getenv("AGENT_PORT", "9000")
+    agent_url = f"http://agent-{command['device_id']}:{AGENT_PORT}/execute"  # Dynamic agent URL
 
     payload = {                                  # Dane wysyłane do agenta
         "command_id": command["command_id"],     # Numer rozkazu
         "command": command["command"]            # Treść
     }
 
-    try:
-        requests.post(agent_url, json=payload)    # Wysłanie komendy do agenta jako JSON
-    except Exception as e:
-        print("Błąd wysyłania do agenta:", e)
+    response = requests.post(agent_url, json=payload)
+    response.raise_for_status()  # Ensure the request succeeds

@@ -1,28 +1,28 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
 import requests
-import time
 import os
+
+app = FastAPI()
 
 SERVER = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
 DEVICE = os.getenv("AGENT_ID", -1)
 
+class ExecuteRequest(BaseModel):
+    command_id: int
+    command: str
 
-while True:
+@app.post("/execute")
+def execute_command(data: ExecuteRequest):
     try:
-        cmds = requests.get(f"{SERVER}/agent/{DEVICE}/commands").json()
-
-        for c in cmds:
-            try:
-                exec(c["command"])
-                result = "OK"
-            except Exception as e:
-                result = str(e)
-
-            requests.post(
-                f"{SERVER}/agent/commands/{c['command_id']}/done",
-                json={"result": result}
-            )
-
+        exec(data.command)
+        result = "OK"
     except Exception as e:
-        print("Błąd połączenia:", e)
+        result = str(e)
 
-    time.sleep(10)
+    requests.post(
+        f"{SERVER}/agent/commands/{data.command_id}/done",
+        json={"result": result}
+    )
+
+    return {"status": "executed"}

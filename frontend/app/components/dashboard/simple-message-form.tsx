@@ -32,6 +32,15 @@ const simpleMessageSchema = z.object({
     message: z.string().min(1, "Message cannot be empty"),
 })
 
+// read Vite env var (string) and convert to number; default to 2 if missing
+const numAgents = Number(import.meta.env.VITE_NUM_AGENTS ?? 2);
+
+// build an array like [{ value: "1", label: "Raspberry Pi 1" }, ...]
+const agentOptions = Array.from({ length: Math.max(1, numAgents) }, (_, i) => ({
+  value: String(i + 1),
+  label: `Raspberry Pi ${i + 1}`,
+}));
+
 // 2. Extract the type from the schema
 type SimpleMessageValues = z.infer<typeof simpleMessageSchema>
 
@@ -104,11 +113,13 @@ export function SimpleMessageForm({
                                                 <SelectValue placeholder="Select Agent" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectGroup>
-                                                    <SelectItem value="rasppi1">Raspberry Pi 1</SelectItem>
-                                                    <SelectItem value="rasppi2">Raspberry Pi 2</SelectItem>
-                                                    <SelectItem value="rasppi3">Raspberry Pi 3</SelectItem>
-                                                </SelectGroup>
+                                            <SelectGroup>
+                                                {agentOptions.map((ag) => (
+                                                <SelectItem key={ag.value} value={ag.value}>
+                                                    {ag.label}
+                                                </SelectItem>
+                                                ))}
+                                            </SelectGroup>
                                             </SelectContent>
                                         </Select>)}
                                 />
