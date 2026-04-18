@@ -22,7 +22,8 @@ class SimpleMessageRequest(BaseModel):
 
 class ResultRequest(BaseModel):
     command_id: int
-    device_id: str
+    # device_id can be absent/null in edge cases; accept integer or null
+    device_id: Optional[int] = None
     status: str
     result: Optional[str] = None
     

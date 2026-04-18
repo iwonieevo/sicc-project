@@ -6,3 +6,5 @@ bcrypt==4.3.0
 python-multipart
 email-validator
 requests
+sqlalchemy
+psycopg2-binary

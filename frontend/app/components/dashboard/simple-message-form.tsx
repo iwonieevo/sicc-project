@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -32,14 +32,10 @@ const simpleMessageSchema = z.object({
     message: z.string().min(1, "Message cannot be empty"),
 })
 
-// read Vite env var (string) and convert to number; default to 2 if missing
-const numAgents = Number(import.meta.env.VITE_NUM_AGENTS ?? 2);
+// (hooks imported above)
 
-// build an array like [{ value: "1", label: "Raspberry Pi 1" }, ...]
-const agentOptions = Array.from({ length: Math.max(1, numAgents) }, (_, i) => ({
-  value: String(i + 1),
-  label: `Raspberry Pi ${i + 1}`,
-}));
+// agentOptions will be fetched from backend
+const defaultAgentOptions = [{ value: "1", label: "Agent 1" }]
 
 // 2. Extract the type from the schema
 type SimpleMessageValues = z.infer<typeof simpleMessageSchema>
@@ -48,6 +44,7 @@ export function SimpleMessageForm({
     className,
     ...props
 }: React.ComponentProps<"div">) {
+    const [agentOptions, setAgentOptions] = useState(defaultAgentOptions)
     const [serverError, setServerError] = useState<string | null>(null)
     const navigate = useNavigate()
     const { login } = useAuth()
@@ -88,6 +85,21 @@ export function SimpleMessageForm({
             setServerError(error.message)
         }
     }
+
+    useEffect(() => {
+        let mounted = true
+        fetch('/api/devices')
+            .then(r => r.json())
+            .then((devices) => {
+                if (!mounted) return
+                const opts = (devices || []).map((d: any) => ({ value: String(d.id), label: d.name || `Agent ${d.id}` }))
+                if (opts.length === 0) opts.push({ value: '1', label: 'Agent 1' })
+                setAgentOptions(opts)
+            })
+            .catch(() => {})
+
+        return () => { mounted = false }
+    }, [])
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
