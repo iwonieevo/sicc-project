@@ -19,7 +19,7 @@ class ExecuteRequest(BaseModel):
 @app.on_event("startup")
 def register_with_server():
     # Attempt to register with the IoT server several times
-    hostname = os.getenv("HOSTNAME") or socket.gethostname()
+    hostname = socket.gethostname()
     name = f"agent-{hostname}"
     payload = {"host": hostname, "port": AGENT_PORT, "name": name}
 

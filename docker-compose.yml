@@ -7,10 +7,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - BACKEND_URL=${BACKEND_URL}
-      - ENV=${ENV}
+    env_file:
+      - .env
+      - env/.env.frontend
     depends_on:
       - backend
     networks:
@@ -22,9 +21,9 @@ services:
       - "${BACKEND_PORT}:8000"
     volumes:
       - ./backend:/app
-    env_file: .env
-    environment:
-      - ENV=${ENV}
+    env_file:
+      - .env
+      - env/.env.backend
     depends_on:
       db:
         condition: service_healthy
@@ -40,10 +39,9 @@ services:
       - "${IOT_SERVER_PORT}:7000"
     volumes:
       - ./server-iot:/app
-    env_file: .env
-    environment:
-      - ENV=${ENV}
-      - AGENT_PORT=${AGENT_PORT}
+    env_file:
+      - .env
+      - env/.env.iot
     depends_on:
       db:
         condition: service_healthy
@@ -53,26 +51,25 @@ services:
 
   agent:
     build: ./agents
-    env_file: .env
-    environment:
-      - ENV=${ENV}
-      - AGENT_PORT=${AGENT_PORT}
-      - BACKEND_URL=${BACKEND_URL}
+    env_file:
+      - .env
     networks:
       - agent-net
 
   db:
-      build: ./db
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-      env_file: .env
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-        interval: 5s
-        timeout: 5s
-        retries: 5
-      networks:
-        - internal
+    build: ./db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+      - env/.env.db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
 
 networks:
   public:       # frontend <-> backend
