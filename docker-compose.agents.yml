@@ -1,0 +1,48 @@
+networks:
+  agent-net:
+    external: true
+    name: ${AGENT_NET_NAME}
+
+x-agent-base: &agent-base
+  build: ./agents
+  env_file:
+    - .env
+    - env/.env.agent
+  networks:
+    - agent-net
+
+services:
+  agent-alpha:
+    <<: *agent-base
+    container_name: agent-alpha
+    environment:
+      - AGENT_NAME=agent-alpha
+    profiles: ["alpha", "all"]
+
+  agent-beta:
+    <<: *agent-base
+    container_name: agent-beta
+    environment:
+      - AGENT_NAME=agent-beta
+    profiles: ["beta", "all"]
+
+  agent-gamma:
+    <<: *agent-base
+    container_name: agent-gamma
+    environment:
+      - AGENT_NAME=agent-gamma
+    profiles: ["gamma", "all"]
+
+  agent-delta:
+    <<: *agent-base
+    container_name: agent-delta
+    environment:
+      - AGENT_NAME=agent-delta
+    profiles: ["delta", "all"]
+
+  agent-epsilon:
+    <<: *agent-base
+    container_name: agent-epsilon
+    environment:
+      - AGENT_NAME=agent-epsilon
+    profiles: ["epsilon", "all"]

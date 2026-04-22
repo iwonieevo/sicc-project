@@ -1,5 +1,3 @@
--- Seed data for development testing
-
 INSERT INTO commands (name, description, python_code) VALUES
 (
     'echo',
