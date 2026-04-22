@@ -1,6 +1,3 @@
-# README.md
-
-```markdown
 # SICC - Secure IoT Control Center
 
 Distributed system for remote command execution on IoT agents with secure communication, role-based access control, and comprehensive audit logging.
