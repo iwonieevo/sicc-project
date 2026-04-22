@@ -1,5 +1,4 @@
 services:
-
   frontend:
     build: ./frontend
     ports:
@@ -48,17 +47,6 @@ services:
       - internal
       - agent-net
 
-  agent:
-    build: ./agents
-    env_file:
-      - .env
-      - env/.env.agent
-    depends_on:
-      iot-server:
-        condition: service_started
-    networks:
-      - agent-net
-
   db:
     build: ./db
     volumes:
@@ -74,9 +62,10 @@ services:
       - internal
 
 networks:
-  public:       # frontend <-> backend
-  internal:     # backend <-> iot-server <-> db
-  agent-net:    # iot-server <-> agents
+  public:
+  internal:
+  agent-net:
+    name: ${AGENT_NET_NAME}
 
 volumes:
   postgres_data:
