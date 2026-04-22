@@ -1,26 +1,42 @@
-import type { Route } from "../+types/root";
+import { useAuth } from "~/providers/AuthProvider";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Navigate } from "react-router";
 
-export async function clientLoader({ params }: Route.ClientLoaderArgs) {
-    const data: { user: String } = await fetch("/api/me", {
-        credentials: "include",
-        headers: {
-            authorization: "Bearer " + localStorage.getItem("accessToken"), // TODO: for now, it's access token, but it will be removed when backend is ready
-        },
-    }).then((res) => res.json());
+export default function Page() {
+  const { user, loading, logout } = useAuth();
 
-    return data;
-}
-
-export function HydrateFallback() {
-    return <div>Loading...</div>;
-}
-
-export default function Page({ loaderData }: Route.ComponentProps) {
+  if (loading) {
     return (
-        <div className="flex items-center justify-center pt-16 pb-4">
-            <div>
-                /api/me: {JSON.stringify(loaderData as any)}
+      <div className="flex items-center justify-center pt-16">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <div className="flex items-center justify-center pt-16 pb-4">
+      <div className="w-full max-w-md">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Profile</CardTitle>
+            <CardDescription>Your account information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Email</p>
+              <p className="font-medium">{user.email}</p>
             </div>
-        </div>
-    )
+            <Button variant="destructive" className="w-full" onClick={logout}>
+              Sign Out
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 }

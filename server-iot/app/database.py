@@ -3,13 +3,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 
-# Prefer backend-specific DB credentials when available
+# Prefer IoT-specific DB credentials when provided
 DB_ENV = {
     "NAME": os.getenv("POSTGRES_DB"),
     "HOST": os.getenv("POSTGRES_HOST"),
     "PORT": os.getenv("POSTGRES_PORT"),
-    "USER": os.getenv("DB_BACKEND_USER", os.getenv("POSTGRES_USER")),
-    "PASSWORD": os.getenv("DB_BACKEND_PASSWORD", os.getenv("POSTGRES_PASSWORD"))
+    "USER": os.getenv("DB_IOT_USER", os.getenv("POSTGRES_USER")),
+    "PASSWORD": os.getenv("DB_IOT_PASSWORD", os.getenv("POSTGRES_PASSWORD"))
 }
 
 if None in DB_ENV.values():

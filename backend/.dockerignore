@@ -1,7 +1,6 @@
-node_modules/
-.react-router/
-dist/
-build/
+__pycache__/
+*.py[cod]
+*.so
 
 .env
 .env.*
@@ -19,5 +18,10 @@ logs/
 .idea/
 *.swp
 *.swo
+
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
 
 README.md

@@ -3,16 +3,6 @@ from sqlalchemy.sql import func
 from .database import Base
 
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(BigInteger, primary_key=True)
-    email = Column(Text, unique=True, nullable=False)
-    hashed_password = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now())
-    is_deleted = Column(Boolean, nullable=False, default=False)
-
-
 class Device(Base):
     __tablename__ = "devices"
     id = Column(BigInteger, primary_key=True)
@@ -49,6 +39,28 @@ class CommandParameter(Base):
     is_deleted = Column(Boolean, nullable=False, default=False)
 
 
+class CommandQueue(Base):
+    __tablename__ = "command_queue"
+    id = Column(BigInteger, primary_key=True)
+    device_id = Column(BigInteger, ForeignKey("devices.id"), nullable=False)
+    command_id = Column(BigInteger, ForeignKey("commands.id"), nullable=False)
+    parameters = Column(JSON, nullable=True)
+    queued_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
+
+
+class CommandExecution(Base):
+    __tablename__ = "command_executions"
+    queue_id = Column(BigInteger, ForeignKey("command_queue.id"), primary_key=True)
+    started_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
+
+
+class CommandResult(Base):
+    __tablename__ = "command_results"
+    queue_id = Column(BigInteger, ForeignKey("command_queue.id"), primary_key=True)
+    is_error = Column(Boolean, nullable=False)
+    result = Column(Text, nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
+
 class VCommandLog(Base):
     __tablename__ = "v_command_log"
     __table_args__ = {'info': {'is_view': True}}
@@ -62,14 +74,3 @@ class VCommandLog(Base):
     is_error = Column(Boolean)
     result = Column(Text)
     status = Column(Text)
-
-
-class AuditLog(Base):
-    __tablename__ = "audit_log"
-    id = Column(BigInteger, primary_key=True)
-    table_name = Column(Text, nullable=False)
-    operation = Column(Text, nullable=False)
-    row_id = Column(BigInteger, nullable=True)
-    old_data = Column(JSON, nullable=True)
-    new_data = Column(JSON, nullable=True)
-    changed_at = Column(DateTime(timezone=True), server_default=func.now())

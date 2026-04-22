@@ -1,23 +1,28 @@
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
+import os
 
-SECRET_KEY = "your_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from app.database import SessionLocal
+from app.models import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_change_me_in_production")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-users_db = {}
+# OAuth2 scheme - tokenUrl should match your login endpoint
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login", auto_error=False)
+
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -28,24 +33,70 @@ def create_access_token(data: dict):
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials"
-    )
+    """Get current user from JWT token."""
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
-    
+        
         if email is None:
-            raise credentials_exception
-    
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     except JWTError:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    user = users_db.get(email)
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(
+            User.email == email,
+            User.is_deleted == False
+        ).first()
+        
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        return {"email": user.email}
+    finally:
+        db.close()
+
+
+def get_current_user_optional(token: str = Depends(oauth2_scheme)):
+    """Get current user from JWT token, returns None if not authenticated."""
+    if not token:
+        return None
     
-    if user is None:
-        raise credentials_exception
-    
-    return user
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        
+        if email is None:
+            return None
+            
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(
+                User.email == email,
+                User.is_deleted == False
+            ).first()
+            return {"email": user.email} if user else None
+        finally:
+            db.close()
+    except JWTError:
+        return None

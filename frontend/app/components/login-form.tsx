@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { Link, useNavigate } from "react-router"
 
 import { cn } from "~/lib/utils"
 import { Button } from "~/components/ui/button"
@@ -21,16 +22,13 @@ import {
   FieldLabel,
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
-import { Link, useNavigate } from "react-router"
 import { useAuth } from "~/providers/AuthProvider"
 
-// 1. Define the validation schema
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
-// 2. Extract the type from the schema
 type LoginFormValues = z.infer<typeof loginSchema>
 
 export function LoginForm({
@@ -41,20 +39,15 @@ export function LoginForm({
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  // 3. Initialize the form
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   })
 
-  // 4. Handle form submission
   const onSubmit = async (data: LoginFormValues) => {
     setServerError(null)
     try {
@@ -68,13 +61,12 @@ export function LoginForm({
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.detail || "Something went wrong")
+        throw new Error(result.detail || "Invalid email or password")
       }
 
-      // Handle success (e.g., redirect or update auth state)
-      console.log("Login successful:", result)
-      login(result.access_token) // TODO: change to user data when backend is ready
-      navigate("/")
+      localStorage.setItem("accessToken", result.access_token)
+      login(data.email, result.access_token)
+      navigate("/dashboard")
     } catch (error: any) {
       setServerError(error.message)
     }
@@ -92,7 +84,6 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)}>
             <FieldGroup>
-              {/* Email Field */}
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
@@ -107,17 +98,8 @@ export function LoginForm({
                 )}
               </Field>
 
-              {/* Password Field */}
               <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
                 <Input
                   {...register("password")}
                   id="password"
@@ -129,7 +111,6 @@ export function LoginForm({
                 )}
               </Field>
 
-              {/* Server-side Error Display */}
               {serverError && (
                 <p className="text-sm text-center font-medium text-destructive">
                   {serverError}
@@ -142,7 +123,8 @@ export function LoginForm({
                 </Button>
 
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <Link to="/signup" className="underline">
+                  Don&apos;t have an account?{" "}
+                  <Link to="/signup" className="underline">
                     Sign up
                   </Link>
                 </FieldDescription>

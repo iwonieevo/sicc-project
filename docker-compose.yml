@@ -1,30 +1,82 @@
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
-    environment:
-      - ENV=development
-      - IOT_SERVER_URL=http://iot-server:7000
-  iot-server:
-    build: ./ServerIoT
-    ports:
-      - "7000:7000"
-    volumes:
-      - ./ServerIoT:/app
-    environment:
-      - ENV=development
-      - BACKEND_URL=http://backend:8000
-      - AGENT_URL=http://agent:9000
+
   frontend:
     build: ./frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT}:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - ENV=development
-      - CHOKIDAR_USEPOLLING=true
+    env_file:
+      - .env
+      - env/.env.frontend
+    depends_on:
+      - backend
+    networks:
+      - public
+
+  backend:
+    build: ./backend
+    ports:
+      - "${BACKEND_PORT}:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+      - env/.env.backend
+    depends_on:
+      db:
+        condition: service_healthy
+      iot-server:
+        condition: service_started
+    networks:
+      - public
+      - internal
+
+  iot-server:
+    build: ./server-iot
+    ports:
+      - "${IOT_SERVER_PORT}:7000"
+    volumes:
+      - ./server-iot:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - agent-net
+
+  agent:
+    build: ./agents
+    env_file:
+      - .env
+      - env/.env.agent
+    depends_on:
+      iot-server:
+        condition: service_started
+    networks:
+      - agent-net
+
+  db:
+    build: ./db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+networks:
+  public:       # frontend <-> backend
+  internal:     # backend <-> iot-server <-> db
+  agent-net:    # iot-server <-> agents
+
+volumes:
+  postgres_data:
