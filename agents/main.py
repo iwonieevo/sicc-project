@@ -26,7 +26,7 @@ class Config:
 
     @classmethod
     def from_env(cls) -> "Config":
-        agent_name = socket.gethostname()
+        agent_name = os.getenv("AGENT_NAME", socket.gethostname())
         iot_server_url = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
         poll_interval = int(os.getenv("POLL_INTERVAL", 2))
         
