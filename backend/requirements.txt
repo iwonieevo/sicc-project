@@ -7,3 +7,4 @@ email-validator
 requests
 sqlalchemy
 psycopg2-binary
+pydantic

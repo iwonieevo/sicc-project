@@ -1,33 +1,22 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
 
-# Build the database URL from environment variables
-# Prefer backend-specific DB credentials when available (DB_BACKEND_USER / DB_BACKEND_PASSWORD)
-POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "changeme")
-POSTGRES_DB = os.getenv("POSTGRES_DB", "sicc")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "db")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 
-DB_USER = os.getenv("DB_BACKEND_USER") or POSTGRES_USER
-DB_PASSWORD = os.getenv("DB_BACKEND_PASSWORD") or POSTGRES_PASSWORD
+# Prefer backend-specific DB credentials when available
+DB_ENV = {
+    "NAME": os.getenv("POSTGRES_DB"),
+    "HOST": os.getenv("POSTGRES_HOST"),
+    "PORT": os.getenv("POSTGRES_PORT"),
+    "USER": os.getenv("DB_BACKEND_USER", os.getenv("POSTGRES_USER")),
+    "PASSWORD": os.getenv("DB_BACKEND_PASSWORD", os.getenv("POSTGRES_PASSWORD"))
+}
 
-DATABASE_URL = os.getenv("DATABASE_URL") or (
-    f"postgresql://{DB_USER}:{DB_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-)
+if None in DB_ENV.values():
+    raise RuntimeError(f"Missing required database environment variables: {', '.join(name for name, value in DB_ENV.items() if value is None)}")
+
+DATABASE_URL = f"postgresql://{DB_ENV['USER']}:{DB_ENV['PASSWORD']}@{DB_ENV['HOST']}:{DB_ENV['PORT']}/{DB_ENV['NAME']}"
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
-
-def init_db():
-    # Only attempt to create tables when running as the DB superuser or when
-    # explicitly requested via the INIT_DB environment flag. Application
-    # service accounts (e.g. `backend`) typically don't have CREATE rights
-    # and attempting to create tables will fail on startup.
-    init_flag = os.getenv("INIT_DB", "false").lower() in ("1", "true", "yes")
-    if DB_USER == POSTGRES_USER or init_flag:
-        Base.metadata.create_all(bind=engine)

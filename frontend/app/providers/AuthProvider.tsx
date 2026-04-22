@@ -1,75 +1,58 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { Outlet, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 
 interface AuthContextType {
-    loading: boolean;
-    user: String | null;
-    login: (data: string) => Promise<void>;
-    logout: () => void;
+  loading: boolean;
+  user: { email: string } | null;
+  login: (email: string, token: string) => void;
+  logout: () => void;
 }
 
-const defaultValue: AuthContextType = {
-    loading: true,
-    user: null, // TODO: for now, it's access token, but it will be user data when backend is ready
-    login: async () => { },
-    logout: () => { }
-};
+const AuthContext = createContext<AuthContextType>({
+  loading: true,
+  user: null,
+  login: () => {},
+  logout: () => {}
+});
 
-export const AuthContext = createContext(defaultValue);
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState(defaultValue.user);
-    const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{ email: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        fetch("/api/me", {
-            credentials: "include",
-            headers: {
-                authorization: "Bearer " + localStorage.getItem("accessToken"), // TODO: for now, it's access token, but it will be removed when backend is ready
-            },
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error("Failed to fetch user");
-                }
-                return res.json()
-            })
-            .then((data) => {
-                console.log("Fetched user data:", data);
-                setUser(localStorage.getItem("accessToken"));
-                setLoading(false);
-            })
-            .catch((err) => {
-                console.log("errr");
-                localStorage.removeItem("accessToken")
-                console.error("Failed to fetch user:", err);
-                setLoading(false);
-            });
-    }, []);
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-    const navigate = useNavigate();
-    const value = useMemo(() => {
-        // call this function when you want to authenticate the user
-        const login = async (userData: string) => {
-            setUser(userData);
-            localStorage.setItem("accessToken", userData); // TODO: to remove when backend is ready (HttpOnly cookie will be used instead)
-            navigate("/");
-        };
+    fetch("/api/me", {
+      credentials: "include",
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setUser({ email: data.email }))
+      .catch(() => localStorage.removeItem("accessToken"))
+      .finally(() => setLoading(false));
+  }, []);
 
-        // call this function to sign out logged in user
-        const logout = () => {
-            setUser(null);
-            localStorage.removeItem("accessToken"); // TODO: to remove when backend is ready (HttpOnly cookie will be used instead)
-            navigate("/login", { replace: true });
-        };
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login: (email: string, token: string) => {
+      localStorage.setItem("accessToken", token);
+      setUser({ email });
+      navigate("/dashboard");
+    },
+    logout: () => {
+      localStorage.removeItem("accessToken");
+      setUser(null);
+      navigate("/login", { replace: true });
+    }
+  }), [user, loading, navigate]);
 
-        return { user, login, logout, loading };
-    }, [user, navigate, setUser, loading]);
-
-    return (
-        <AuthContext value={value}>
-            {children}
-        </AuthContext>
-    );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

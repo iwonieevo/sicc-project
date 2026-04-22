@@ -11,10 +11,9 @@ export default [
         layout("./components/dashboard/_layout.tsx", [
             ...prefix("dashboard", [
                 index("routes/dashboard/home.tsx"),
+                route("commands", "routes/dashboard/commands.tsx"),
                 route("logs", "routes/dashboard/logs.tsx"),
-                route("simple-message", "routes/dashboard/simple-message.tsx"),
             ]),
         ]),
     ]),
-
 ] satisfies RouteConfig;

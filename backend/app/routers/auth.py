@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.schemas import UserRegister, UserLogin, TokenResponse, UserResponse
+from app.schemas import UserRegister, UserLogin, TokenResponse
 from app.auth import (
     hash_password,
     verify_password,

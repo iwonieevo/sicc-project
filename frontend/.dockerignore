@@ -1,45 +1,23 @@
-# Node.js
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-package-lock.json.bak
-
-# Build artifacts
-build/
-dist/
 .react-router/
+dist/
+build/
 
-# OS & Logs
+.env
+.env.*
+
+.git
+.gitignore
+.gitattributes
+
 .DS_Store
 Thumbs.db
 *.log
 logs/
 
-# Git
-.git
-.gitignore
-.gitattributes
-
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# Environment
-.env
-.env.*
-
-# Testing
-.coverage
-.jest_cache/
-test/
-tests/
-
-# Documentation
 README.md
-DOCKERFILE
-tsconfig*.json

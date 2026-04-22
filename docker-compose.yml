@@ -41,7 +41,6 @@ services:
       - ./server-iot:/app
     env_file:
       - .env
-      - env/.env.iot
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +52,10 @@ services:
     build: ./agents
     env_file:
       - .env
+      - env/.env.agent
+    depends_on:
+      iot-server:
+        condition: service_started
     networks:
       - agent-net
 
@@ -62,7 +65,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
     env_file:
       - .env
-      - env/.env.db
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
