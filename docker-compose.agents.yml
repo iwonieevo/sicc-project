@@ -8,10 +8,16 @@ x-agent-base: &agent-base
   env_file:
     - .env
     - env/.env.agent
+  environment:
+    - IOT_SERVER_URL=http://iot-server:7000
   networks:
     - agent-net
 
 services:
+  agent:
+    <<: *agent-base
+    profiles: ["never"]
+
   agent-alpha:
     <<: *agent-base
     container_name: agent-alpha

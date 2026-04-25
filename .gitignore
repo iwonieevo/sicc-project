@@ -1,7 +1,7 @@
 # Environment
 .env
-.env.local
-env/
+env/*
+!env/.env*.example
 
 # OS
 .DS_Store
@@ -45,7 +45,6 @@ wheels/
 PIPFILE.lock
 .venv/
 venv/
-ENV/
 env.bak/
 venv.bak/
 

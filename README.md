@@ -1,147 +1,169 @@
 # SICC - Secure IoT Control Center
 
-Distributed system for remote command execution on IoT agents with secure communication, role-based access control, and comprehensive audit logging.
+Distributed system for remote command execution on IoT agents via a web interface.
 
 ## Prerequisites
 
 - Docker
 - Docker Compose v2
-- Git (optional)
 
-## Architecture Overview
+---
 
-### Components
+## Configuration
 
-| Service | Technology | Port | Description |
-|---------|------------|------|-------------|
-| Frontend | React + Vite + shadcn/ui | 3000 | Web UI for user interaction |
-| Backend | FastAPI (Python) | 8000 | Auth, command management, API gateway |
-| IoT Server | FastAPI (Python) | 7000 | Agent orchestration, command queuing |
-| Agent | Python | - | Edge device simulator, executes commands |
-| Database | PostgreSQL 16 | 5432 | Persistent storage |
-
-### Database Schema
-
-**Core Tables**
-- `users` - Web authentication, passwords hashed
-- `devices` - Agent registry with status tracking
-- `commands` - Available command definitions (Python code)
-- `command_parameters` - Parameter metadata for commands
-
-**Lifecycle Tables** (IoT Server only)
-- `command_queue` - Commands awaiting execution
-- `command_executions` - Commands currently running
-- `command_results` - Completed command results
-
-**Views**
-- `v_command_log` - Unified command lifecycle status
-
-**Audit**
-- `audit_log` - Immutable change tracking (triggers on config tables)
-
-### Command Lifecycle States
-
-| State | Description |
-|-------|-------------|
-| `queued` | In command_queue only |
-| `running` | In command_queue + command_executions |
-| `done` | All three tables, is_error = FALSE |
-| `error` | All three tables, is_error = TRUE |
-
-## Environment Variables
-
-### .env (root)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FRONTEND_PORT` | 3000 | Frontend exposed port |
-| `BACKEND_PORT` | 8000 | Backend API port |
-| `IOT_SERVER_PORT` | 7000 | IoT Server port |
-| `AGENT_NET_NAME` | sicc-agent-net | Docker network name for agents |
-| `POSTGRES_DB` | sicc | Database name |
-| `POSTGRES_HOST` | db | Database host |
-| `POSTGRES_USER` | admin | Postgres superuser |
-| `POSTGRES_PASSWORD` | - | Postgres superuser password |
-| `DB_BACKEND_USER` | backend | Backend service DB user |
-| `DB_BACKEND_PASSWORD` | - | Backend service DB password |
-| `DB_IOT_USER` | iot_server | IoT Server DB user |
-| `DB_IOT_PASSWORD` | - | IoT Server DB password |
-
-### env/.env.backend
-
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET_KEY` | Secret for JWT signing (change in production) |
-| `JWT_ALGORITHM` | JWT algorithm (HS256) |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration time |
-
-### env/.env.agent
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `POLL_INTERVAL` | 2 | Seconds between command polls |
-| `IOT_SERVER_URL` | http://iot-server:7000 | IoT Server URL |
-
-### env/.env.frontend
-
-| Variable | Description |
-|----------|-------------|
-| `CHOKIDAR_USEPOLLING` | Enable polling for file changes in Docker |
-
-## Getting Started
-
-### 1. Clone and Configure
+Copy and fill in the example environment files before starting anything:
 
 ```bash
-git clone <repository-url>
-cd sicc-project
 cp .env.example .env
-# Edit .env with your values (passwords, keys, etc.)
+cp env/.env.agent.example env/.env.agent
+cp env/.env.backend.example env/.env.backend
 ```
 
-### 2. Start Infrastructure
+### `.env` (root)
+
+| Variable | Default | Description |
+|---|---|---|
+| `FRONTEND_EXPOSED_PORT` | `3000` | Host port exposed for the frontend |
+| `BACKEND_EXPOSED_PORT` | `8000` | Host port exposed for the backend |
+| `IOT_SERVER_EXPOSED_PORT` | `7000` | Host port exposed for the IoT server |
+| `POSTGRES_EXPOSED_PORT` | `5432` | Host port exposed for PostgreSQL |
+| `AGENT_NET_NAME` | `sicc-agent-net` | Docker network shared between infra and agents |
+| `POSTGRES_DB` | `sicc` | Database name |
+| `POSTGRES_USER` | `admin` | Postgres superuser name |
+| `POSTGRES_PASSWORD` | | Postgres superuser password (required) |
+| `DB_BACKEND_PASSWORD` | | DB password for the backend service (required) |
+| `DB_IOT_PASSWORD` | | DB password for the IoT server (required) |
+| `ENV` | `development` | Runtime environment (`development` / `production`) |
+
+### `env/.env.agent`
+
+| Variable | Default | Description |
+|---|---|---|
+| `POLL_INTERVAL` | `2` | Seconds between command polls to the IoT server |
+| `REGISTRATION_ATTEMPTS` | `10` | Number of registration retries on startup |
+
+### `env/.env.backend`
+
+| Variable | Default | Description |
+|---|---|---|
+| `JWT_SECRET_KEY` | | Secret used to sign JWTs (change in production) |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token lifetime in minutes |
+
+---
+
+## Running the Project
+
+### Start everything at once
 
 ```bash
-docker-compose -f docker-compose.infra.yml up -d
+docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all up -d --build
 ```
 
-This starts: frontend, backend, iot-server, and database.
+### Start infrastructure only
 
-Verify:
 ```bash
-docker-compose -f docker-compose.infra.yml ps
+docker-compose -f docker-compose.infra.yml up -d --build
 ```
 
-### 3. Start Agents
+### Start agents only (infrastructure must already be running)
 
-Start all predefined agents:
+All agents:
 ```bash
 docker-compose -f docker-compose.agents.yml --profile all up -d
 ```
 
-Start specific agents:
+Specific agents:
 ```bash
 docker-compose -f docker-compose.agents.yml --profile alpha --profile beta up -d
 ```
 
-Start everything together:
+---
+
+## Stopping the Project
+
+### Stop everything
+
 ```bash
-docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all up -d
+docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all down
 ```
 
-### 4. Access the Application
+### Stop infrastructure only
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- IoT Server: http://localhost:7000
+```bash
+docker-compose -f docker-compose.infra.yml down
+```
 
-Create an account via the signup page, then log in.
+### Stop all agents (leave infrastructure running)
+
+```bash
+docker-compose -f docker-compose.agents.yml --profile all down
+```
+
+### Stop a specific agent
+
+```bash
+docker-compose -f docker-compose.agents.yml --profile alpha down
+# or directly:
+docker stop agent-alpha && docker rm agent-alpha
+```
+
+---
+
+## Resetting the Database
+
+Bring everything down and remove the volume:
+
+```bash
+docker-compose -f docker-compose.infra.yml down -v
+```
+
+Then start again:
+
+```bash
+docker-compose -f docker-compose.infra.yml up -d --build
+```
+
+---
+
+## Logs
+
+```bash
+# All infrastructure services
+docker-compose -f docker-compose.infra.yml logs -f
+
+# Specific infrastructure service
+docker-compose -f docker-compose.infra.yml logs -f iot-server
+docker-compose -f docker-compose.infra.yml logs -f backend
+
+# All agents
+docker-compose -f docker-compose.agents.yml --profile all logs -f
+
+# Specific agent
+docker logs -f agent-alpha
+```
+
+---
 
 ## Managing Agents
 
-### Adding a New Agent
+### Predefined agents
 
-Edit `docker-compose.agents.yml` and add a new service:
+The following named agents are defined in `docker-compose.agents.yml`, each with its own Docker Compose profile:
+
+| Agent | Profile |
+|---|---|
+| `agent-alpha` | `alpha` |
+| `agent-beta` | `beta` |
+| `agent-gamma` | `gamma` |
+| `agent-delta` | `delta` |
+| `agent-epsilon` | `epsilon` |
+
+Use `--profile all` to start all of them at once.
+
+### Adding a named agent
+
+Add a new service to `docker-compose.agents.yml`:
 
 ```yaml
 agent-zeta:
@@ -152,71 +174,34 @@ agent-zeta:
   profiles: ["zeta", "all"]
 ```
 
-Start it:
+Then start it:
+
 ```bash
 docker-compose -f docker-compose.agents.yml --profile zeta up -d
 ```
 
-### Stopping Agents
+### Scaling agents dynamically
 
-Stop all agents (infrastructure keeps running):
-```bash
-docker-compose -f docker-compose.agents.yml --profile all down
-```
-
-Stop specific agent:
-```bash
-docker stop agent-alpha && docker rm agent-alpha
-```
-
-### Viewing Logs
-
-Infrastructure logs:
-```bash
-docker-compose -f docker-compose.infra.yml logs -f
-```
-
-All agents logs:
-```bash
-docker-compose -f docker-compose.agents.yml --profile all logs -f
-```
-
-Specific service logs:
-```bash
-docker-compose -f docker-compose.infra.yml logs -f backend
-docker logs -f agent-alpha
-```
-
-## Development
-
-### Rebuilding After Code Changes
+For anonymous agents, use the base `agent` service with `--scale`. It has the `never` profile to prevent accidental standalone use:
 
 ```bash
-docker-compose -f docker-compose.infra.yml build --no-cache
-docker-compose -f docker-compose.agents.yml build --no-cache
+docker-compose -f docker-compose.agents.yml --profile never up -d --scale agent=5
 ```
 
-### Database Reset
+Each container falls back to its Docker hostname as the agent name since no `AGENT_NAME` is set:
 
-```bash
-docker-compose -f docker-compose.infra.yml down -v
-docker-compose -f docker-compose.infra.yml up -d
+```python
+agent_name = os.getenv("AGENT_NAME", socket.gethostname())
 ```
 
-## Stopping Everything
+---
 
-```bash
-docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all down
-```
+## Access
 
-To also remove volumes (database data):
-```bash
-docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all down -v
-```
+Once running, services are available on the ports configured in `.env`:
 
-## Security Notes
+- Frontend (`FRONTEND_EXPOSED_PORT`) - default http://localhost:3000
+- Backend API (`BACKEND_EXPOSED_PORT`) - default http://localhost:8000
+- IoT Server (`IOT_SERVER_EXPOSED_PORT`) - default http://localhost:7000
 
-- Change `JWT_SECRET_KEY` and database passwords in production
-- Use HTTPS in production (not configured in development)
-- The system uses soft deletes (`is_deleted` flag) - no data is permanently removed
-- Audit log tracks all configuration changes automatically
+Create an account via the sign-up page, then log in to issue commands.
