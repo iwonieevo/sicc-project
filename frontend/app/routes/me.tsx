@@ -27,9 +27,9 @@ export default function Page() {
             <CardDescription>Your account information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="font-medium">{user.email}</p>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Email</p>
+              <p className="font-medium text-sm">{user.email}</p>
             </div>
             <Button variant="destructive" className="w-full" onClick={logout}>
               Sign Out
