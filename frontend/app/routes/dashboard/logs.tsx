@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Navigate } from "react-router";
 import { useAuth } from "~/providers/AuthProvider";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 
 interface CommandLog {
   queue_id: number;
@@ -22,24 +23,39 @@ export default function Page() {
   const [logs, setLogs] = useState<CommandLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
-  useEffect(() => {
+  const fetchLogs = async (silent = false) => {
     if (!user) return;
+    if (!silent)
+      setLoadingLogs(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      fetch('/api/logs', {
+        credentials: "include",
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          console.log("Logs loaded:", data);
+          setLogs(data);
+        })
+        .catch(err => {
+          console.error("Failed to fetch logs:", err);
+          // setLogs([]);
+        })
+        .finally(() => setLoadingLogs(false));
+    } catch (err) {
+      console.error("Error fetching logs:", err);
+      // setLogs([]);
+      setLoadingLogs(false);
+    }
+  };
 
-    const token = localStorage.getItem("accessToken");
-    fetch('/api/logs', {
-      credentials: "include",
-      headers: { "Authorization": `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
-        console.log("Logs loaded:", data);
-        setLogs(data);
-      })
-      .catch(err => {
-        console.error("Failed to fetch logs:", err);
-        setLogs([]);
-      })
-      .finally(() => setLoadingLogs(false));
+  useEffect(() => {
+    fetchLogs();
+
+    // fetch logs every 2 seconds to keep the view updated
+    const interval = setInterval(() => fetchLogs(true), 2000);
+    return () => clearInterval(interval);
   }, [user]);
 
   if (loading) {
@@ -54,24 +70,6 @@ export default function Page() {
     return <Navigate to="/login" replace />;
   }
 
-  if (loadingLogs) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <p>Loading logs...</p>
-      </div>
-    );
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'queued': return 'text-yellow-600';
-      case 'running': return 'text-blue-600';
-      case 'done': return 'text-green-600';
-      case 'error': return 'text-red-600';
-      default: return 'text-gray-600';
-    }
-  };
-
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return null;
     return new Date(dateStr).toLocaleString();
@@ -84,6 +82,17 @@ export default function Page() {
           <CardHeader>
             <CardTitle>Command Execution Logs</CardTitle>
             <CardDescription>View history of executed commands</CardDescription>
+            <CardAction>
+              {loadingLogs ? (
+                <Button variant="link" className="text-foreground" disabled>
+                  Loading...
+                </Button>
+              ) : (
+                <Button variant="link" className="text-foreground" onClick={fetchLogs}>
+                  Reload
+                </Button>
+              )}
+            </CardAction>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
