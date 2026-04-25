@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Navigate } from "react-router";
 import { useAuth } from "~/providers/AuthProvider";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 
 interface CommandLog {
   queue_id: number;
   device_id: number;
   command_id: number;
   parameters?: Record<string, any>;
-  status: string;
+  status: 'queued' | 'running' | 'done' | 'error';
   result?: string;
   is_error?: boolean;
   queued_at?: string;
@@ -21,24 +23,39 @@ export default function Page() {
   const [logs, setLogs] = useState<CommandLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
-  useEffect(() => {
+  const fetchLogs = async (silent = false) => {
     if (!user) return;
-    
-    const token = localStorage.getItem("accessToken");
-    fetch('/api/logs', {
-      credentials: "include",
-      headers: { "Authorization": `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
-        console.log("Logs loaded:", data);
-        setLogs(data);
+    if (!silent)
+      setLoadingLogs(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      fetch('/api/logs', {
+        credentials: "include",
+        headers: { "Authorization": `Bearer ${token}` }
       })
-      .catch(err => {
-        console.error("Failed to fetch logs:", err);
-        setLogs([]);
-      })
-      .finally(() => setLoadingLogs(false));
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          console.log("Logs loaded:", data);
+          setLogs(data);
+        })
+        .catch(err => {
+          console.error("Failed to fetch logs:", err);
+          // setLogs([]);
+        })
+        .finally(() => setLoadingLogs(false));
+    } catch (err) {
+      console.error("Error fetching logs:", err);
+      // setLogs([]);
+      setLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+
+    // fetch logs every 2 seconds to keep the view updated
+    const interval = setInterval(() => fetchLogs(true), 2000);
+    return () => clearInterval(interval);
   }, [user]);
 
   if (loading) {
@@ -53,24 +70,6 @@ export default function Page() {
     return <Navigate to="/login" replace />;
   }
 
-  if (loadingLogs) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <p>Loading logs...</p>
-      </div>
-    );
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'queued': return 'text-yellow-600';
-      case 'running': return 'text-blue-600';
-      case 'done': return 'text-green-600';
-      case 'error': return 'text-red-600';
-      default: return 'text-gray-600';
-    }
-  };
-
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return null;
     return new Date(dateStr).toLocaleString();
@@ -83,43 +82,53 @@ export default function Page() {
           <CardHeader>
             <CardTitle>Command Execution Logs</CardTitle>
             <CardDescription>View history of executed commands</CardDescription>
+            <CardAction>
+              {loadingLogs ? (
+                <Button variant="link" className="text-foreground" disabled>
+                  Loading...
+                </Button>
+              ) : (
+                <Button variant="link" className="text-foreground" onClick={fetchLogs}>
+                  Reload
+                </Button>
+              )}
+            </CardAction>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {logs.map((log) => (
-                <div key={log.queue_id} className="p-3 border rounded-lg">
+                <div key={log.queue_id} className="p-3 border-l-4">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex flex-wrap gap-2">
                       <span className="font-semibold">Queue: {log.queue_id}</span>
                       <span className="text-sm text-gray-500">Device: {log.device_id}</span>
                       <span className="text-sm text-gray-500">Command: {log.command_id}</span>
                     </div>
-                    <span className={`font-medium ${getStatusColor(log.status)}`}>
-                      {log.status}
-                    </span>
+                    <Badge variant={log.status}>
+                      {log.status.toUpperCase()}
+                    </Badge>
                   </div>
-                  
+
                   {log.parameters && Object.keys(log.parameters).length > 0 && (
                     <div className="text-xs text-gray-500 mb-2">
                       Parameters: {JSON.stringify(log.parameters)}
                     </div>
                   )}
-                  
+
                   <div className="text-xs text-gray-400 space-x-4">
                     {log.queued_at && <span>Queued: {formatDate(log.queued_at)}</span>}
                     {log.started_at && <span>Started: {formatDate(log.started_at)}</span>}
                     {log.finished_at && <span>Finished: {formatDate(log.finished_at)}</span>}
                   </div>
-                  
+
                   {log.result && (
-                      <div className="mt-2">
-                          <strong className="text-sm">Result:</strong>
-                          <pre className={`p-2 rounded mt-1 text-xs overflow-auto max-h-48 whitespace-pre-wrap break-words ${
-                              log.is_error ? 'text-red-800 border border-red-200' : 'text-green-800 border border-gray-200'
-                          }`}>
-                              {log.result}
-                          </pre>
-                      </div>
+                    <div className="mt-2">
+                      <strong className="text-sm">Result:</strong>
+                      <pre className={`py-2 px-3 rounded mt-1 text-xs overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word ${log.is_error ? 'text-red-400 border border-red-400' : 'text-green-400 bg-muted'
+                        }`}>
+                        {log.result}
+                      </pre>
+                    </div>
                   )}
                 </div>
               ))}
