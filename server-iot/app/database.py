@@ -1,22 +1,26 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.engine import URL
 
 
-# Prefer IoT-specific DB credentials when provided
-DB_ENV = {
-    "NAME": os.getenv("POSTGRES_DB"),
-    "HOST": os.getenv("POSTGRES_HOST"),
-    "PORT": os.getenv("POSTGRES_PORT"),
-    "USER": os.getenv("DB_IOT_USER", os.getenv("POSTGRES_USER")),
-    "PASSWORD": os.getenv("DB_IOT_PASSWORD", os.getenv("POSTGRES_PASSWORD"))
-}
+def get_env(name: str) -> str:
+    value = os.getenv(name)
+    if value is None:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
 
-if None in DB_ENV.values():
-    raise RuntimeError(f"Missing required database environment variables: {', '.join(name for name, value in DB_ENV.items() if value is None)}")
+engine = create_engine(
+    URL.create(
+        drivername="postgresql",
+        username=get_env("DB_USER"),
+        password=get_env("DB_IOT_PASSWORD"),
+        host=get_env("POSTGRES_HOST"),
+        port=get_env("POSTGRES_PORT"),
+        database=get_env("POSTGRES_DB"),
+    ),
+    pool_pre_ping=True,
+)
 
-DATABASE_URL = f"postgresql://{DB_ENV['USER']}:{DB_ENV['PASSWORD']}@{DB_ENV['HOST']}:{DB_ENV['PORT']}/{DB_ENV['NAME']}"
-
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

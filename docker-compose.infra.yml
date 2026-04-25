@@ -2,13 +2,13 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "${FRONTEND_PORT}:3000"
+      - "${FRONTEND_EXPOSED_PORT}:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    env_file:
-      - .env
-      - env/.env.frontend
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
     networks:
@@ -17,12 +17,17 @@ services:
   backend:
     build: ./backend
     ports:
-      - "${BACKEND_PORT}:8000"
+      - "${BACKEND_EXPOSED_PORT}:8000"
     volumes:
       - ./backend:/app
     env_file:
       - .env
       - env/.env.backend
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - DB_USER=backend
+      - IOT_SERVER_URL=http://iot-server:7000
     depends_on:
       db:
         condition: service_healthy
@@ -35,11 +40,15 @@ services:
   iot-server:
     build: ./server-iot
     ports:
-      - "${IOT_SERVER_PORT}:7000"
+      - "${IOT_SERVER_EXPOSED_PORT}:7000"
     volumes:
       - ./server-iot:/app
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - DB_USER=iot_server
     depends_on:
       db:
         condition: service_healthy
@@ -49,6 +58,8 @@ services:
 
   db:
     build: ./db
+    ports:
+      - "${POSTGRES_EXPOSED_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     env_file:
