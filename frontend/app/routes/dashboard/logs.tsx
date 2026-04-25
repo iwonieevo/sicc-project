@@ -115,7 +115,7 @@ export default function Page() {
                   {log.result && (
                     <div className="mt-2">
                       <strong className="text-sm">Result:</strong>
-                      <pre className={`p-2 rounded mt-1 text-xs overflow-auto max-h-48 whitespace-pre-wrap break-words ${log.is_error ? 'text-red-400 border border-red-400' : 'text-green-400 bg-muted'
+                      <pre className={`py-2 px-3 rounded mt-1 text-xs overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word ${log.is_error ? 'text-red-400 border border-red-400' : 'text-green-400 bg-muted'
                         }`}>
                         {log.result}
                       </pre>

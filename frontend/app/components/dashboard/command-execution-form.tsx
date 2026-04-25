@@ -19,6 +19,7 @@ import {
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectValue, SelectTrigger } from "~/components/ui/select"
+import { Badge } from "../ui/badge"
 
 interface Device {
     id: number
@@ -117,7 +118,7 @@ export function CommandExecutionForm({
 
     useEffect(() => {
         if (!executionStatus || !isPolling) return
-        
+
         if (executionStatus.status === 'done' || executionStatus.status === 'error') {
             setIsPolling(false)
             return
@@ -134,7 +135,7 @@ export function CommandExecutionForm({
                 if (res.ok) {
                     const data = await res.json();
                     setExecutionStatus(data);
-                    
+
                     if (data.status === 'done' || data.status === 'error') {
                         setIsPolling(false);
                     }
@@ -165,7 +166,7 @@ export function CommandExecutionForm({
 
         try {
             const parameters: Record<string, any> = {};
-            
+
             if (currentCommand && currentCommand.parameters.length > 0) {
                 for (const param of currentCommand.parameters) {
                     const value = formData[`param_${param.id}`];
@@ -343,16 +344,16 @@ export function CommandExecutionForm({
                         )}
 
                         {executionStatus && (
-                            <div className="p-4 bg-gray-50 rounded-md border">
-                                <h4 className="font-semibold mb-2">Execution Status</h4>
-                                <p className="text-sm mb-2">
+                            <div className="p-4 rounded-md border">
+                                <h4 className="mb-2">Execution Status</h4>
+                                <p className="mb-2">
                                     <strong>Queue ID:</strong> {executionStatus.queue_id}
                                 </p>
-                                <p className="text-sm mb-2">
+                                <p className="mb-2">
                                     <strong>Status:</strong>{' '}
-                                    <span className={getExecutionStatusColor(executionStatus.status)}>
-                                        {executionStatus.status}
-                                    </span>
+                                    <Badge variant={executionStatus.status}>
+                                        {executionStatus.status.toUpperCase()}
+                                    </Badge>
                                 </p>
                                 {executionStatus.queued_at && (
                                     <p className="text-xs text-gray-500">
@@ -372,7 +373,7 @@ export function CommandExecutionForm({
                                 {executionStatus.result && (
                                     <div className="mt-2">
                                         <strong className="text-sm">Result:</strong>
-                                        <pre className="bg-white p-2 rounded mt-1 text-xs overflow-auto max-h-48">
+                                        <pre className="py-2 px-3 rounded mt-1 text-xs overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word bg-muted">
                                             {executionStatus.result}
                                         </pre>
                                     </div>
@@ -383,9 +384,9 @@ export function CommandExecutionForm({
                             </div>
                         )}
 
-                        <Button 
-                            type="submit" 
-                            className="w-full" 
+                        <Button
+                            type="submit"
+                            className="w-full"
                             disabled={isSubmitting || isLoading || !selectedDevice || !selectedCommand}
                         >
                             {isSubmitting || isLoading ? "Executing..." : "Execute Command"}
