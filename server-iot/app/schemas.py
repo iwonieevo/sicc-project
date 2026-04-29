@@ -45,6 +45,13 @@ class CommandParameterResponse(BaseModel):
     default_value: Optional[str]
     description: Optional[str]
 
+class CommandParameterRequest(BaseModel):
+    name: str
+    param_type: str = "text"
+    is_required: bool = True
+    default_value: Optional[str] = None
+    description: Optional[str] = None
+
 
 class CommandResponse(BaseModel):
     id: int

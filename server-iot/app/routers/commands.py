@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.database import SessionLocal
 from app.models import Command, CommandParameter
 from app.utility import build_function
@@ -46,3 +46,14 @@ def get_commands():
         return result
     finally:
         db.close()
+
+@router.post("/commands")
+def create_command():
+    """
+    Placeholder for future command creation endpoint.
+    TODO: Add authorization/security before enabling.
+    """
+    raise HTTPException(
+        status_code=501,
+        detail="Command creation not implemented yet"
+    )
