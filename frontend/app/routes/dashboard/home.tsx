@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 
 export default function Page() {
     return (
@@ -10,13 +11,27 @@ export default function Page() {
                         <h1 className="text-center text-4xl font-bold">Dashboard</h1>
                     </div>
                 </header>
-                <div className="max-w-[300px] w-full space-x-2 px-4 flex items-center justify-center">
-                    <Button variant="default" size="lg" asChild className="mb-0">
-                        <Link to="/dashboard/simple-message">Send Simple Message (String Test)</Link>
-                    </Button>
-                    <Button variant="outline" size="lg" asChild className="mb-0">
-                        <Link to="/dashboard/logs">View Logs (WIP)</Link>
-                    </Button>
+                <div className="max-w-[600px] w-full px-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>IoT Command Center</CardTitle>
+                            <CardDescription>
+                                Execute commands on connected IoT devices
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <Button variant="default" size="lg" asChild className="w-full">
+                                <Link to="/dashboard/commands">
+                                    Execute Command
+                                </Link>
+                            </Button>
+                            <Button variant="outline" size="lg" asChild className="w-full">
+                                <Link to="/dashboard/logs">
+                                    View Execution Logs
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </main>

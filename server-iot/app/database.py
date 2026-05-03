@@ -14,7 +14,7 @@ engine = create_engine(
     URL.create(
         drivername="postgresql",
         username=get_env("DB_USER"),
-        password=get_env("DB_BACKEND_PASSWORD"),
+        password=get_env("DB_IOT_PASSWORD"),
         host=get_env("POSTGRES_HOST"),
         port=get_env("POSTGRES_PORT"),
         database=get_env("POSTGRES_DB"),

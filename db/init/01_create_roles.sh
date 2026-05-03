@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+CREATE ROLE backend    LOGIN PASSWORD '${DB_BACKEND_PASSWORD}';
+CREATE ROLE iot_server LOGIN PASSWORD '${DB_IOT_PASSWORD}';
+EOSQL
