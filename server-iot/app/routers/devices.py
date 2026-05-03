@@ -1,26 +1,26 @@
 from fastapi import APIRouter
 from app.database import SessionLocal
 from app.models import Device
+from app.schemas import DeviceResponse
 
 router = APIRouter()
 
-
-@router.get("/devices")
+@router.get("/devices", response_model=list[DeviceResponse])
 def get_devices():
+    """Get all registered devices for backend."""
     db = SessionLocal()
     try:
         devices = db.query(Device).filter(
             Device.is_deleted == False
-        ).order_by(Device.updated_at.desc()).all()
+        ).all()
+
         return [
-            {
-                "id": d.id,
-                "name": d.name,
-                "status": d.status,
-                "last_seen": d.last_seen.isoformat() if d.last_seen else None,
-                "registered_at": d.registered_at.isoformat() if d.registered_at else None,
-                "updated_at": d.updated_at.isoformat() if d.updated_at else None
-            }
+            DeviceResponse(
+                id=d.id,
+                name=d.name,
+                status=d.status,
+                last_seen=d.last_seen,
+            )
             for d in devices
         ]
     finally:
