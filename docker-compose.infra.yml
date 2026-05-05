@@ -21,8 +21,8 @@ services:
     volumes:
       - ./backend:/app
       - type: bind
-        source: ./db/certs/ca.crt
-        target: /run/secrets/db-ca.crt
+        source: ./db/certs
+        target: /run/secrets/db-certs
         read_only: true
         bind:
           create_host_path: false
@@ -34,7 +34,7 @@ services:
       - POSTGRES_PORT=5432
       - DB_USER=backend
       - DB_SSLMODE=verify-full
-      - DB_SSLROOTCERT=/run/secrets/db-ca.crt
+      - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
       - IOT_SERVER_URL=http://iot-server:7000
     depends_on:
       db:
@@ -52,8 +52,8 @@ services:
     volumes:
       - ./server-iot:/app
       - type: bind
-        source: ./db/certs/ca.crt
-        target: /run/secrets/db-ca.crt
+        source: ./db/certs
+        target: /run/secrets/db-certs
         read_only: true
         bind:
           create_host_path: false
@@ -64,7 +64,7 @@ services:
       - POSTGRES_PORT=5432
       - DB_USER=iot_server
       - DB_SSLMODE=verify-full
-      - DB_SSLROOTCERT=/run/secrets/db-ca.crt
+      - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
     depends_on:
       db:
         condition: service_healthy
@@ -79,14 +79,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - type: bind
-        source: ./db/certs/server.crt
-        target: /run/secrets/postgres-tls/server.crt
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./db/certs/server.key
-        target: /run/secrets/postgres-tls/server.key
+        source: ./db/certs
+        target: /run/secrets/postgres-tls
         read_only: true
         bind:
           create_host_path: false
