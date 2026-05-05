@@ -29,8 +29,6 @@ Generate local development certificates before starting the project:
 
 On Windows:
   .\\scripts\\generate-db-certs.ps1
-
-The generated files are stored under db/certs/ and are intentionally ignored by Git.
 EOF
   exit 1
 fi
