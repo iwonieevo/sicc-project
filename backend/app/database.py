@@ -10,6 +10,14 @@ def get_env(name: str) -> str:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
 
+connect_args = {
+    "sslmode": os.getenv("DB_SSLMODE", "verify-full"),
+}
+
+sslrootcert = os.getenv("DB_SSLROOTCERT")
+if sslrootcert:
+    connect_args["sslrootcert"] = sslrootcert
+
 engine = create_engine(
     URL.create(
         drivername="postgresql",
@@ -19,6 +27,7 @@ engine = create_engine(
         port=get_env("POSTGRES_PORT"),
         database=get_env("POSTGRES_DB"),
     ),
+    connect_args=connect_args,
     pool_pre_ping=True,
 )
 

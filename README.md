@@ -19,36 +19,50 @@ cp env/.env.agent.example env/.env.agent
 cp env/.env.backend.example env/.env.backend
 ```
 
+Generate local database TLS certificates before starting the infrastructure:
+
+```bash
+sh scripts/generate-db-certs.sh
+```
+
+On Windows:
+
+```powershell
+.\scripts\generate-db-certs.ps1
+```
+
+This creates a local CA and a PostgreSQL server certificate under `db/certs/`.
+
 ### `.env` (root)
 
-| Variable | Default | Description |
-|---|---|---|
-| `FRONTEND_EXPOSED_PORT` | `3000` | Host port exposed for the frontend |
-| `BACKEND_EXPOSED_PORT` | `8000` | Host port exposed for the backend |
-| `IOT_SERVER_EXPOSED_PORT` | `7000` | Host port exposed for the IoT server |
-| `POSTGRES_EXPOSED_PORT` | `5432` | Host port exposed for PostgreSQL |
-| `AGENT_NET_NAME` | `sicc-agent-net` | Docker network shared between infra and agents |
-| `POSTGRES_DB` | `sicc` | Database name |
-| `POSTGRES_USER` | `admin` | Postgres superuser name |
-| `POSTGRES_PASSWORD` | | Postgres superuser password (required) |
-| `DB_BACKEND_PASSWORD` | | DB password for the backend service (required) |
-| `DB_IOT_PASSWORD` | | DB password for the IoT server (required) |
-| `ENV` | `development` | Runtime environment (`development` / `production`) |
+| Variable                  | Default          | Description                                        |
+| ------------------------- | ---------------- | -------------------------------------------------- |
+| `FRONTEND_EXPOSED_PORT`   | `3000`           | Host port exposed for the frontend                 |
+| `BACKEND_EXPOSED_PORT`    | `8000`           | Host port exposed for the backend                  |
+| `IOT_SERVER_EXPOSED_PORT` | `7000`           | Host port exposed for the IoT server               |
+| `POSTGRES_EXPOSED_PORT`   | `5432`           | Host port exposed for PostgreSQL                   |
+| `AGENT_NET_NAME`          | `sicc-agent-net` | Docker network shared between infra and agents     |
+| `POSTGRES_DB`             | `sicc`           | Database name                                      |
+| `POSTGRES_USER`           | `admin`          | Postgres superuser name                            |
+| `POSTGRES_PASSWORD`       |                  | Postgres superuser password (required)             |
+| `DB_BACKEND_PASSWORD`     |                  | DB password for the backend service (required)     |
+| `DB_IOT_PASSWORD`         |                  | DB password for the IoT server (required)          |
+| `ENV`                     | `development`    | Runtime environment (`development` / `production`) |
 
 ### `env/.env.agent`
 
-| Variable | Default | Description |
-|---|---|---|
-| `POLL_INTERVAL` | `2` | Seconds between command polls to the IoT server |
-| `REGISTRATION_ATTEMPTS` | `10` | Number of registration retries on startup |
+| Variable                | Default | Description                                     |
+| ----------------------- | ------- | ----------------------------------------------- |
+| `POLL_INTERVAL`         | `2`     | Seconds between command polls to the IoT server |
+| `REGISTRATION_ATTEMPTS` | `10`    | Number of registration retries on startup       |
 
 ### `env/.env.backend`
 
-| Variable | Default | Description |
-|---|---|---|
-| `JWT_SECRET_KEY` | | Secret used to sign JWTs (change in production) |
-| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token lifetime in minutes |
+| Variable                          | Default | Description                                     |
+| --------------------------------- | ------- | ----------------------------------------------- |
+| `JWT_SECRET_KEY`                  |         | Secret used to sign JWTs (change in production) |
+| `JWT_ALGORITHM`                   | `HS256` | JWT signing algorithm                           |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`    | Token lifetime in minutes                       |
 
 ---
 
@@ -69,11 +83,13 @@ docker-compose -f docker-compose.infra.yml up -d --build
 ### Start agents only (infrastructure must already be running)
 
 All agents:
+
 ```bash
 docker-compose -f docker-compose.agents.yml --profile all up -d
 ```
 
 Specific agents:
+
 ```bash
 docker-compose -f docker-compose.agents.yml --profile alpha --profile beta up -d
 ```
@@ -151,12 +167,12 @@ docker logs -f agent-alpha
 
 The following named agents are defined in `docker-compose.agents.yml`, each with its own Docker Compose profile:
 
-| Agent | Profile |
-|---|---|
-| `agent-alpha` | `alpha` |
-| `agent-beta` | `beta` |
-| `agent-gamma` | `gamma` |
-| `agent-delta` | `delta` |
+| Agent           | Profile   |
+| --------------- | --------- |
+| `agent-alpha`   | `alpha`   |
+| `agent-beta`    | `beta`    |
+| `agent-gamma`   | `gamma`   |
+| `agent-delta`   | `delta`   |
 | `agent-epsilon` | `epsilon` |
 
 Use `--profile all` to start all of them at once.
