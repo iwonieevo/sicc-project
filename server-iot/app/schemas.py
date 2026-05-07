@@ -33,9 +33,6 @@ class DeviceResponse(BaseModel):
     name: str
     status: str
     last_seen: Optional[datetime]
-    registered_at: Optional[datetime]
-    updated_at: Optional[datetime]
-
 
 class CommandParameterResponse(BaseModel):
     id: int
@@ -57,11 +54,7 @@ class CommandResponse(BaseModel):
     id: int
     name: str
     description: Optional[str]
-    func_definition: str
     parameters: List[CommandParameterResponse]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-
 
 class CommandStatusResponse(BaseModel):
     queue_id: int
@@ -75,8 +68,12 @@ class CommandStatusResponse(BaseModel):
     result: Optional[str]
     status: str
 
-
 class PollCommandResponse(BaseModel):
     queue_id: int
     function_code: str
     parameters: Dict[str, Any]
+
+class CommandCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    python_code: str
