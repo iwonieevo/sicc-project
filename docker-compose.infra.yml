@@ -20,6 +20,12 @@ services:
       - "${BACKEND_EXPOSED_PORT}:8000"
     volumes:
       - ./backend:/app
+      - type: bind
+        source: ./db/certs
+        target: /run/secrets/db-certs
+        read_only: true
+        bind:
+          create_host_path: false
     env_file:
       - .env
       - env/.env.backend
@@ -27,6 +33,8 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - DB_USER=backend
+      - DB_SSLMODE=verify-full
+      - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
       - IOT_SERVER_URL=http://iot-server:7000
     depends_on:
       db:
@@ -43,12 +51,20 @@ services:
       - "${IOT_SERVER_EXPOSED_PORT}:7000"
     volumes:
       - ./server-iot:/app
+      - type: bind
+        source: ./db/certs
+        target: /run/secrets/db-certs
+        read_only: true
+        bind:
+          create_host_path: false
     env_file:
       - .env
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - DB_USER=iot_server
+      - DB_SSLMODE=verify-full
+      - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
     depends_on:
       db:
         condition: service_healthy
@@ -62,8 +78,25 @@ services:
       - "${POSTGRES_EXPOSED_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ./db/certs
+        target: /run/secrets/postgres-tls
+        read_only: true
+        bind:
+          create_host_path: false
+      - ./db/config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     env_file:
       - .env
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/tls/server.key
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

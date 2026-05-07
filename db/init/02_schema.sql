@@ -127,6 +127,10 @@ CREATE TRIGGER trg_audit_command_parameters
     AFTER INSERT OR UPDATE OR DELETE ON command_parameters
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log();
 
+CREATE TRIGGER trg_audit_command_queue
+    AFTER INSERT OR UPDATE OR DELETE ON command_queue
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log();
+
 --====================================================================
 CREATE OR REPLACE FUNCTION fn_set_updated_at()
 RETURNS TRIGGER AS $$
