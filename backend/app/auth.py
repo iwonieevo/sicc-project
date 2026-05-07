@@ -4,6 +4,7 @@ import bcrypt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
 import os
+import string
 
 from app.database import SessionLocal
 from app.models import User
@@ -23,6 +24,41 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
+def validate_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must have at least 8 characters"
+        )
+
+    if len(password) > 72:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must have at most 72 characters"
+        )
+
+    if password != password.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Password cannot start or end with spaces"
+        )
+
+    if not any(char.isdigit() for char in password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain at least one number"
+        )
+
+    if not any(char.isupper() for char in password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain at least one uppercase letter"
+        )
+    if not any(char in string.punctuation for char in password):
+            raise HTTPException(
+                status_code=400,
+                detail="Password must contain at least one special character"
+            )
 
 def create_access_token(data: dict):
     to_encode = data.copy()

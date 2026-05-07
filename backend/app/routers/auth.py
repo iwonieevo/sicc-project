@@ -4,7 +4,8 @@ from app.auth import (
     hash_password,
     verify_password,
     create_access_token,
-    get_current_user
+    get_current_user,
+    validate_password
 )
 from app.database import SessionLocal
 from app.models import User
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/api", tags=["auth"])
 
 @router.post("/signup")
 def register(user: UserRegister):
+    validate_password(user.password)
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.email == user.email).first()
