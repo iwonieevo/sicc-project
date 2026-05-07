@@ -11,6 +11,8 @@ from app.schemas import (
     ExecuteCommandResponse,
     CommandCreateRequest,
     ResultCallbackRequest,
+    QueueItemResponse,
+    QueueDeleteResponse,
 )
 from app.auth import get_current_user
 
@@ -170,4 +172,31 @@ def receive_result(request: ResultCallbackRequest):
         method="POST",
         path="/result",
         json_data=model_to_dict(request),
+    )
+
+@router.get("/devices/{device_id}/queue", response_model=list[QueueItemResponse])
+def get_device_queue(
+    device_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get the command queue for a selected device.
+    """
+    return forward_to_server(
+        method="GET",
+        path=f"/devices/{device_id}/queue",
+    )
+
+@router.delete("/devices/{device_id}/queue/{queue_id}", response_model=QueueDeleteResponse)
+def delete_queue_task(
+    device_id: int,
+    queue_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Delete a queued command for a selected device.
+    """
+    return forward_to_server(
+        method="DELETE",
+        path=f"/devices/{device_id}/queue/{queue_id}",
     )

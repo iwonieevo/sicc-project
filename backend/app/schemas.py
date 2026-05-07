@@ -86,3 +86,18 @@ class ResultCallbackRequest(BaseModel):
     queue_id: int
     is_error: bool
     result: Optional[str] = None
+
+
+# Queue schemas
+class QueueItemResponse(BaseModel):
+    queue_id: int
+    command_id: int
+    command_name: str
+    parameters: Optional[Dict[str, Any]] = None
+    status: str
+    can_delete: bool
+
+class QueueDeleteResponse(BaseModel):
+    status: str
+    device_id: int
+    queue_id: int
