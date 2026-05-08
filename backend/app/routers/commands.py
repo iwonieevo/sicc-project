@@ -12,7 +12,7 @@ from app.schemas import (
     CommandCreateRequest,
     ResultCallbackRequest,
     QueueItemResponse,
-    QueueDeleteResponse,
+    QueueCancelResponse,
 )
 from app.auth import get_current_user
 
@@ -180,23 +180,23 @@ def get_device_queue(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Get the command queue for a selected device.
+    Get the queue for a selected device.
     """
     return forward_to_server(
         method="GET",
         path=f"/devices/{device_id}/queue",
     )
 
-@router.delete("/devices/{device_id}/queue/{queue_id}", response_model=QueueDeleteResponse)
-def delete_queue_task(
+@router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)
+def cancel_queue_task(
     device_id: int,
     queue_id: int,
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Delete a queued command for a selected device.
+    Cancel a queued command for a selected device.
     """
     return forward_to_server(
-        method="DELETE",
-        path=f"/devices/{device_id}/queue/{queue_id}",
+        method="POST",
+        path=f"/devices/{device_id}/queue/{queue_id}/cancel",
     )
