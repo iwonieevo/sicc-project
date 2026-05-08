@@ -83,10 +83,10 @@ class QueueItemResponse(BaseModel):
     command_name: str
     parameters: Optional[Dict[str, Any]]
     status: str
-    can_delete: bool 
+    can_cancel: bool 
 
 
-class QueueDeleteResponse(BaseModel):
+class QueueCancelResponse(BaseModel):
     status: str
     device_id: int
     queue_id: int 

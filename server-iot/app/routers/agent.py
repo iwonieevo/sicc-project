@@ -4,7 +4,7 @@ import logging
 
 from app.database import SessionLocal
 from app.models import Device, Command, CommandParameter, CommandQueue, CommandExecution, CommandResult
-from app.schemas import RegisterRequest, RegisterResponse, CallbackRequest, PollCommandResponse
+from app.schemas import RegisterRequest, RegisterResponse, CallbackRequest 
 from app.utility import build_function
 
 
@@ -70,7 +70,8 @@ def poll_commands(device_id: int):
             CommandExecution, CommandQueue.id == CommandExecution.queue_id
         ).filter(
             CommandQueue.device_id == device_id,
-            CommandExecution.queue_id == None
+            CommandExecution.queue_id == None,
+            CommandQueue.is_cancelled == False
         ).order_by(CommandQueue.queued_at).first()
         
         if not queue:

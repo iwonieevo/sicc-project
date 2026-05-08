@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS command_queue (
     device_id        BIGINT NOT NULL REFERENCES devices(id) ON DELETE RESTRICT,
     command_id       BIGINT NOT NULL REFERENCES commands(id) ON DELETE RESTRICT,
     parameters       JSONB,
-    queued_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    queued_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    is_cancelled     BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS command_executions (
@@ -76,6 +77,7 @@ SELECT
     r.is_error,
     r.result,
     CASE
+        WHEN q.is_cancelled = TRUE                         THEN 'cancelled'
         WHEN r.queue_id IS NOT NULL AND r.is_error = FALSE THEN 'done'
         WHEN r.queue_id IS NOT NULL AND r.is_error = TRUE  THEN 'error'
         WHEN e.queue_id IS NOT NULL                        THEN 'running'
