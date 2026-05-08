@@ -46,7 +46,7 @@ class CommandQueue(Base):
     command_id = Column(BigInteger, ForeignKey("commands.id"), nullable=False)
     parameters = Column(JSON, nullable=True)
     queued_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
-
+    is_cancelled = Column(Boolean, nullable=False, default=False)
 
 class CommandExecution(Base):
     __tablename__ = "command_executions"

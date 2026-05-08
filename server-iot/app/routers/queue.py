@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.database import SessionLocal
 from app.models import Device, Command, CommandQueue, VCommandLog
-from app.schemas import QueueItemResponse, QueueDeleteResponse
+from app.schemas import QueueItemResponse, QueueCancelResponse
 
 
 router = APIRouter()
@@ -39,7 +39,7 @@ def get_device_queue(device_id: int):
                 command_name=command.name,
                 parameters=log.parameters,
                 status=log.status,
-                can_delete=log.status == "queued"
+                can_cancel=log.status == "queued"
             )
 
             for log, command in queue_items
@@ -48,9 +48,9 @@ def get_device_queue(device_id: int):
     finally:
         db.close()
 
-@router.delete("/devices/{device_id}/queue/{queue_id}", response_model=QueueDeleteResponse)
-def delete_queue_task(device_id: int, queue_id: int):
-    """Deleted queued command if it has not been started yet"""
+@router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)
+def cancel_queue_task(device_id: int, queue_id: int):
+    """Cancel queued command if it has not been started yet"""
 
     db = SessionLocal()
     try:
@@ -68,7 +68,7 @@ def delete_queue_task(device_id: int, queue_id: int):
         if queue_log.status != "queued":
             raise HTTPException(
                 status_code=409,
-                detail="Cannot delete task that is already running or finished"
+                detail="Cannot cancel task that is already running or finished"
             )
         
         queue_task = db.query(CommandQueue).filter(
@@ -82,11 +82,11 @@ def delete_queue_task(device_id: int, queue_id: int):
                 detail="Queue task not found"
             )
         
-        db.delete(queue_task)
+        queue_task.is_cancelled = True
         db.commit()
 
-        return QueueDeleteResponse(
-            status="deleted",
+        return QueueCancelResponse(
+            status="cancelled",
             device_id=device_id,
             queue_id=queue_id
         )
