@@ -6,6 +6,7 @@ Distributed system for remote command execution on IoT agents via a web interfac
 
 - Docker
 - Docker Compose v2
+- OpenSSL (for generating database TLS certificates)
 
 ---
 
@@ -19,19 +20,25 @@ cp env/.env.agent.example env/.env.agent
 cp env/.env.backend.example env/.env.backend
 ```
 
-Generate local database TLS certificates before starting the infrastructure:
+OpenSSL must be available on your PATH. On Linux/macOS:
 
 ```bash
 sh scripts/generate-db-certs.sh
 ```
 
-On Windows:
+On Windows, the recommended approach is Git Bash (which bundles OpenSSL):
+
+```bash
+MSYS_NO_PATHCONV=1 sh scripts/generate-db-certs.sh
+```
+
+Alternatively, if OpenSSL is on your PATH, the PowerShell script works too:
 
 ```powershell
 .\scripts\generate-db-certs.ps1
 ```
 
-This creates a local CA and a PostgreSQL server certificate under `db/certs/`.
+This creates a local CA and a PostgreSQL server certificate under `db/certs/`. The script will refuse to overwrite existing certificates - delete the files in `db/certs/` first if you need to regenerate them.
 
 ### `.env` (root)
 

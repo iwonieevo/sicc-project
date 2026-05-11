@@ -49,7 +49,6 @@ class CommandParameterRequest(BaseModel):
     default_value: Optional[str] = None
     description: Optional[str] = None
 
-
 class CommandResponse(BaseModel):
     id: int
     name: str
@@ -77,3 +76,17 @@ class CommandCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     python_code: str
+
+class QueueItemResponse(BaseModel):
+    queue_id: int
+    command_id: int
+    command_name: str
+    parameters: Optional[Dict[str, Any]]
+    status: str
+    can_cancel: bool 
+
+
+class QueueCancelResponse(BaseModel):
+    status: str
+    device_id: int
+    queue_id: int 

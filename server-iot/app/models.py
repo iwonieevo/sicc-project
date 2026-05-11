@@ -52,7 +52,8 @@ class CommandExecution(Base):
     __tablename__ = "command_executions"
     queue_id = Column(BigInteger, ForeignKey("command_queue.id"), primary_key=True)
     started_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
-
+    is_cancelled = Column(Boolean, nullable=False, default=False)
+    
 
 class CommandResult(Base):
     __tablename__ = "command_results"
@@ -66,7 +67,9 @@ class VCommandLog(Base):
     __table_args__ = {'info': {'is_view': True}}
     queue_id = Column(BigInteger, primary_key=True)
     device_id = Column(BigInteger)
+    device_name = Column(Text)
     command_id = Column(BigInteger)
+    command_name = Column(Text)
     parameters = Column(JSON)
     queued_at = Column(DateTime(timezone=True))
     started_at = Column(DateTime(timezone=True))

@@ -77,3 +77,4 @@ def create_command(request: CommandCreateRequest):
         raise
     finally:
         db.close()
+

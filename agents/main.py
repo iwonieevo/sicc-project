@@ -149,6 +149,7 @@ class Agent:
         
         try:
             safe_builtins = {
+                '__import__': __import__,
                 'print': print,
                 'len': len,
                 'str': str,
