@@ -24,6 +24,10 @@ def register_agent(data: RegisterRequest):
                 logger.warning(f"Deleted device '{data.name}' attempted re-registration")
                 raise HTTPException(status_code=400, detail="Device has been deleted")
             
+            if device.status == "online":
+                logger.warning(f"Already online device '{data.name}' attempted registration")
+                raise HTTPException(status_code=400, detail="Device is already online")
+            
             device.status = "online"
             device.last_seen = datetime.now(timezone.utc)
             db.commit()
@@ -70,8 +74,7 @@ def poll_commands(device_id: int):
             CommandExecution, CommandQueue.id == CommandExecution.queue_id
         ).filter(
             CommandQueue.device_id == device_id,
-            CommandExecution.queue_id == None,
-            CommandQueue.is_cancelled == False
+            CommandExecution.queue_id == None
         ).order_by(CommandQueue.queued_at).first()
         
         if not queue:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.database import SessionLocal
-from app.models import Device, Command, CommandQueue, VCommandLog
+from app.models import Device, CommandExecution, CommandQueue, VCommandLog
 from app.schemas import QueueItemResponse, QueueCancelResponse
 
 
@@ -23,10 +23,7 @@ def get_device_queue(device_id: int):
                 detail="Device not found"
             )
         
-        queue_items = db.query(VCommandLog, Command).join(
-            Command,
-            VCommandLog.command_id == Command.id
-        ).filter(
+        log_items = db.query(VCommandLog).filter(
             VCommandLog.device_id == device_id
         ).order_by(
             VCommandLog.queued_at
@@ -36,13 +33,13 @@ def get_device_queue(device_id: int):
             QueueItemResponse(
                 queue_id=log.queue_id,
                 command_id=log.command_id,
-                command_name=command.name,
+                command_name=log.command_name,
                 parameters=log.parameters,
                 status=log.status,
                 can_cancel=log.status == "queued"
             )
 
-            for log, command in queue_items
+            for log in log_items
         ]
     
     finally:
@@ -71,19 +68,10 @@ def cancel_queue_task(device_id: int, queue_id: int):
                 detail="Cannot cancel task that is already running or finished"
             )
         
-        queue_task = db.query(CommandQueue).filter(
-            CommandQueue.id == queue_id,
-            CommandQueue.device_id == device_id
-        ).first()
-
-        if not queue_task:
-            raise HTTPException(
-                status_code=404,
-                detail="Queue task not found"
-            )
-        
-        queue_task.is_cancelled = True
+        command_execution = CommandExecution(queue_id=queue_id, is_cancelled=True)
+        db.add(command_execution)
         db.commit()
+        db.refresh(command_execution)
 
         return QueueCancelResponse(
             status="cancelled",

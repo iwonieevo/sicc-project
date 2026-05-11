@@ -49,13 +49,13 @@ CREATE TABLE IF NOT EXISTS command_queue (
     device_id        BIGINT NOT NULL REFERENCES devices(id) ON DELETE RESTRICT,
     command_id       BIGINT NOT NULL REFERENCES commands(id) ON DELETE RESTRICT,
     parameters       JSONB,
-    queued_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    is_cancelled     BOOLEAN NOT NULL DEFAULT FALSE
+    queued_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS command_executions (
     queue_id         BIGINT PRIMARY KEY REFERENCES command_queue(id) ON DELETE RESTRICT,
-    started_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    started_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    is_cancelled     BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS command_results (
@@ -67,9 +67,11 @@ CREATE TABLE IF NOT EXISTS command_results (
 
 CREATE OR REPLACE VIEW v_command_log AS
 SELECT
-    q.id               AS queue_id,
+    q.id AS queue_id,
     q.device_id,
+    d.name AS device_name,
     q.command_id,
+    c.name AS command_name,
     q.parameters,
     q.queued_at,
     e.started_at,
@@ -77,15 +79,17 @@ SELECT
     r.is_error,
     r.result,
     CASE
-        WHEN q.is_cancelled = TRUE                         THEN 'cancelled'
-        WHEN r.queue_id IS NOT NULL AND r.is_error = FALSE THEN 'done'
-        WHEN r.queue_id IS NOT NULL AND r.is_error = TRUE  THEN 'error'
-        WHEN e.queue_id IS NOT NULL                        THEN 'running'
-        ELSE                                                    'queued'
-    END                 AS status
+        WHEN r.queue_id IS NOT NULL AND r.is_error     = FALSE THEN 'done'
+        WHEN r.queue_id IS NOT NULL AND r.is_error     = TRUE  THEN 'error'
+        WHEN e.queue_id IS NOT NULL AND e.is_cancelled = FALSE THEN 'running'
+        WHEN e.queue_id IS NOT NULL AND e.is_cancelled = TRUE  THEN 'cancelled'
+        ELSE                                                        'queued'
+    END                                                             AS status
 FROM      command_queue      q
 LEFT JOIN command_executions e ON e.queue_id = q.id
-LEFT JOIN command_results    r ON r.queue_id = q.id;
+LEFT JOIN command_results    r ON r.queue_id = q.id
+LEFT JOIN commands           c ON c.id       = q.command_id
+LEFT JOIN devices            d ON d.id       = q.device_id;
 
 --====================================================================
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -127,10 +131,6 @@ CREATE TRIGGER trg_audit_commands
 
 CREATE TRIGGER trg_audit_command_parameters
     AFTER INSERT OR UPDATE OR DELETE ON command_parameters
-    FOR EACH ROW EXECUTE FUNCTION fn_audit_log();
-
-CREATE TRIGGER trg_audit_command_queue
-    AFTER INSERT OR UPDATE OR DELETE ON command_queue
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log();
 
 --====================================================================

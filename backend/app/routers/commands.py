@@ -119,6 +119,9 @@ def execute_command(
         json_data=model_to_dict(request),
     )
 
+    if not response_data:
+        raise HTTPException(status_code=502, detail="IoT server did not return a response")
+
     queue_id = response_data["queue_id"]
 
     return ExecuteCommandResponse(
