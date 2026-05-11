@@ -5,6 +5,7 @@ import logging
 import socket
 from typing import Optional
 from dataclasses import dataclass
+import time
 
 logging.getLogger().handlers.clear()
 
@@ -179,7 +180,7 @@ class Agent:
                 'IndexError': IndexError,
             }
             local_env = {}
-            exec(function_code, {"__builtins__": safe_builtins}, local_env)
+            exec(function_code, {"__builtins__": safe_builtins, 'time': time}, local_env)
             
             if "_sicc_command" not in local_env:
                 raise Exception("Function '_sicc_command' not defined")

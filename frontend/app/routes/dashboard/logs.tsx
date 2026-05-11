@@ -35,7 +35,6 @@ export default function Page() {
       })
         .then(res => res.ok ? res.json() : [])
         .then(data => {
-          console.log("Logs loaded:", data);
           setLogs(data);
         })
         .catch(err => {
