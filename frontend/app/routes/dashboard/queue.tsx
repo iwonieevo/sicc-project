@@ -153,7 +153,7 @@ export default function QueuePage() {
                                                 <div>
                                                     <div className="flex gap-2 items-center mb-1">
                                                         <span className="font-semibold">Queue ID: {item.queue_id}</span>
-                                                        <Badge variant="outline">{item.status.toUpperCase()}</Badge>
+                                                        <Badge variant={item.status as any}>{item.status.toUpperCase()}</Badge>
                                                     </div>
                                                     <div className="text-xs text-gray-500">
                                                         Command ID: {item.command_id} | Queued: {new Date(item.queued_at).toLocaleString()}

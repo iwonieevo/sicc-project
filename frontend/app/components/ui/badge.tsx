@@ -22,6 +22,7 @@ const badgeVariants = cva(
         running: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
         queued: "bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
         error: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+        cancelled: "bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300",
         link: "text-primary underline-offset-4 hover:underline",
       },
     },
