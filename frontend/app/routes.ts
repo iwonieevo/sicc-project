@@ -13,6 +13,7 @@ export default [
                 index("routes/dashboard/home.tsx"),
                 route("commands", "routes/dashboard/commands.tsx"),
                 route("logs", "routes/dashboard/logs.tsx"),
+                route("queue", "routes/dashboard/queue.tsx"),
             ]),
         ]),
     ]),
