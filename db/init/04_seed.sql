@@ -16,6 +16,13 @@ INSERT INTO commands (name, description, python_code) VALUES
 for i in range(abs(sec_count)):
     print(f"Second counter: {i+1}"); time.sleep(1)
 return f"Successfully waited for {abs(sec_count)} seconds"'
+),
+(
+    'dissalowed_command',
+    'This command will always result in ImportError',
+    'import os
+pass
+return f"This will never be returned"'
 );
 
 INSERT INTO command_parameters (command_id, name, param_type, is_required, default_value, description)
