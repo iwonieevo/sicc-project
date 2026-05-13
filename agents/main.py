@@ -3,16 +3,16 @@ import requests
 import asyncio
 import logging
 import socket
-from typing import Optional
+from typing import Optional, ClassVar, List, Dict, Any
 from dataclasses import dataclass
 
-logging.getLogger().handlers.clear()
 
+logging.getLogger().handlers.clear()
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(name)s] %(levelname)s: %(message)s'
 )
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,12 +48,107 @@ class Agent:
     4. Send results back via /agent/callback endpoint
     5. Repeat until interrupted
     """
+
+    __ALLOWED_BUILTINS: ClassVar[Dict[str, Any]] = {
+        'ArithmeticError': ArithmeticError,
+        'AssertionError': AssertionError,
+        'AttributeError': AttributeError,
+        'BaseException': BaseException,
+        'Exception': Exception,
+        'False': False,
+        'IndexError': IndexError,
+        'ImportError': ImportError,
+        'KeyError': KeyError,
+        'LookupError': LookupError,
+        'None': None,
+        'StopIteration': StopIteration,
+        'True': True,
+        'TypeError': TypeError,
+        'ValueError': ValueError,
+        '__build_class__': __build_class__,
+        'abs': abs,
+        'aiter': aiter,
+        'all': all,
+        'anext': anext,
+        'any': any,
+        'ascii': ascii,
+        'bin': bin,
+        'bool': bool,
+        'bytearray': bytearray,
+        'bytes': bytes,
+        'callable': callable,
+        'chr': chr,
+        'complex': complex,
+        'dict': dict,
+        'dir': dir,
+        'divmod': divmod,
+        'enumerate': enumerate,
+        'filter': filter,
+        'float': float,
+        'format': format,
+        'frozenset': frozenset,
+        'hasattr': hasattr,
+        'hash': hash,
+        'hex': hex,
+        'id': id,
+        'int': int,
+        'isinstance': isinstance,
+        'issubclass': issubclass,
+        'iter': iter,
+        'len': len,
+        'list': list,
+        'map': map,
+        'max': max,
+        'min': min,
+        'next': next,
+        'object': object,
+        'oct': oct,
+        'ord': ord,
+        'pow': pow,
+        'print': print,
+        'range': range,
+        'repr': repr,
+        'reversed': reversed,
+        'round': round,
+        'set': set,
+        'slice': slice,
+        'sorted': sorted,
+        'str': str,
+        'sum': sum,
+        'tuple': tuple,
+        'type': type,
+        'zip': zip,
+    }
+
+    __ALLOWED_MODULES: ClassVar[List[str]] = [
+        'time',
+        'math'
+    ]
     
     def __init__(self, config: Config):
         self.config = config
         self.device_id: Optional[int] = None
         self.session = requests.Session()
-        logger.info(f"Initialized agent '{config.agent_name}'")
+        self.__exec_globals: Dict = self.build_exec_globals()
+        LOGGER.info(f"Initialized agent '{config.agent_name}'")
+    
+    @classmethod
+    def build_exec_globals(cls) -> Dict:
+        """Builds `globals` dictionary for `exec` with restricted imports"""
+        def __restricted_import__(name, globals=None, locals=None, fromlist=(), level=0):
+            root_module = name.split('.')[0]
+            if root_module in cls.__ALLOWED_MODULES:
+                return __import__(name, globals, locals, fromlist, level)
+            
+            raise ImportError(f"Import of '{name}' is forbidden in this environment.")
+        
+        exec_globals = {
+            '__builtins__': cls.__ALLOWED_BUILTINS.copy()
+        }
+        exec_globals['__builtins__']['__import__'] = __restricted_import__
+
+        return exec_globals
+        
     
     async def register(self) -> bool:
         """
@@ -62,7 +157,7 @@ class Agent:
         Returns:
             bool: True if registration succeeded, False otherwise
         """
-        logger.info(f"Registering with IoT server at {self.config.iot_server_url}")
+        LOGGER.info(f"Registering with IoT server at {self.config.iot_server_url}")
         
         for attempt in range(1, self.config.registration_retries + 1):
             try:
@@ -76,15 +171,15 @@ class Agent:
                 data = response.json()
                 self.device_id = data["device_id"]
                 status = data["status"]
-                logger.info(f"Registered successfully: device_id={self.device_id}, status={status}")
+                LOGGER.info(f"Registered successfully: device_id={self.device_id}, status={status}")
                 return True
                 
             except requests.RequestException as e:
                 backoff = 2 ** min(attempt - 1, 3)
-                logger.warning(f"Registration attempt {attempt}/{self.config.registration_retries} failed: {e}. Retrying in {backoff}s...")
+                LOGGER.warning(f"Registration attempt {attempt}/{self.config.registration_retries} failed: {e}. Retrying in {backoff}s...")
                 await asyncio.sleep(backoff)
         
-        logger.error("Failed to register after all attempts")
+        LOGGER.error("Failed to register after all attempts")
         return False
     
     async def poll_commands(self) -> Optional[dict]:
@@ -96,7 +191,7 @@ class Agent:
                            and parameters, or None if no commands available
         """
         if self.device_id is None:
-            logger.error("Cannot poll: device_id not set")
+            LOGGER.error("Cannot poll: device_id not set")
             return None
         
         try:
@@ -115,11 +210,11 @@ class Agent:
             if not data or "queue_id" not in data:
                 return None
             
-            logger.info(f"Received command: queue_id={data['queue_id']}")
+            LOGGER.info(f"Received command: queue_id={data['queue_id']}")
             return data
             
         except requests.RequestException as e:
-            logger.warning(f"Poll failed: {e}")
+            LOGGER.warning(f"Poll failed: {e}")
             return None
     
     async def execute_command(self, payload: dict) -> dict:
@@ -140,7 +235,7 @@ class Agent:
         function_code = str(payload.get("function_code"))
         parameters = payload.get("parameters", {})
         
-        logger.info(f"Executing queue_id={queue_id}")
+        LOGGER.info(f"Executing queue_id={queue_id}")
         result_payload = {
             "queue_id": queue_id,
             "is_error": True,
@@ -148,51 +243,21 @@ class Agent:
         }
         
         try:
-            safe_builtins = {
-                '__import__': __import__,
-                'print': print,
-                'len': len,
-                'str': str,
-                'int': int,
-                'float': float,
-                'bool': bool,
-                'list': list,
-                'dict': dict,
-                'tuple': tuple,
-                'range': range,
-                'abs': abs,
-                'min': min,
-                'max': max,
-                'sum': sum,
-                'round': round,
-                'sorted': sorted,
-                'enumerate': enumerate,
-                'zip': zip,
-                'map': map,
-                'filter': filter,
-                'type': type,
-                'isinstance': isinstance,
-                'Exception': Exception,
-                'ValueError': ValueError,
-                'TypeError': TypeError,
-                'KeyError': KeyError,
-                'IndexError': IndexError,
-            }
             local_env = {}
-            exec(function_code, {"__builtins__": safe_builtins}, local_env)
+            exec(function_code, self.__exec_globals, local_env)
             
             if "_sicc_command" not in local_env:
                 raise Exception("Function '_sicc_command' not defined")
             
             result = str(local_env["_sicc_command"](**parameters))
-            logger.info(f"Execution successful: queue_id={queue_id}")
+            LOGGER.info(f"Execution successful: queue_id={queue_id}")
             
             result_payload["is_error"] = False
             result_payload["result"] = result
         
         except Exception as e:
             msg = f"Execution failed: {type(e).__name__}: {e}"
-            logger.error(msg)
+            LOGGER.error(msg)
             result_payload["is_error"] = True
             result_payload["result"] = msg
         
@@ -215,10 +280,10 @@ class Agent:
                 timeout=self.config.request_timeout
             )
             response.raise_for_status()
-            logger.info(f"Callback sent: queue_id={result['queue_id']}")
+            LOGGER.info(f"Callback sent: queue_id={result['queue_id']}")
             return True
         except requests.RequestException as e:
-            logger.error(f"Callback failed: {e}")
+            LOGGER.error(f"Callback failed: {e}")
             return False
     
     async def run(self):
@@ -226,10 +291,10 @@ class Agent:
         Main agent loop: register, then poll-execute-callback indefinitely.
         """
         if not await self.register():
-            logger.error("Startup failed")
+            LOGGER.error("Startup failed")
             return
         
-        logger.info(f"Starting polling loop (interval={self.config.poll_interval}s)")
+        LOGGER.info(f"Starting polling loop (interval={self.config.poll_interval}s)")
         
         try:
             while True:
@@ -240,9 +305,9 @@ class Agent:
                 
                 await asyncio.sleep(self.config.poll_interval)
         except KeyboardInterrupt:
-            logger.info("Shutdown requested")
+            LOGGER.info("Shutdown requested")
         except Exception as e:
-            logger.error(f"Fatal error in polling loop: {e}", exc_info=True)
+            LOGGER.error(f"Fatal error in polling loop: {e}", exc_info=True)
 
 
 async def main():
