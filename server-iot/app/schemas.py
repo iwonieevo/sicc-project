@@ -83,6 +83,7 @@ class QueueItemResponse(BaseModel):
     command_name: str
     parameters: Optional[Dict[str, Any]]
     status: str
+    queued_at: str
     can_cancel: bool 
 
 
