@@ -36,6 +36,7 @@ def get_device_queue(device_id: int):
                 command_name=log.command_name,
                 parameters=log.parameters,
                 status=log.status,
+                queued_at=str(log.queued_at),
                 can_cancel=log.status == "queued"
             )
 
