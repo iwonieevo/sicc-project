@@ -4,6 +4,7 @@ import { Navigate } from "react-router";
 import { useAuth } from "~/providers/AuthProvider";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { formatParameterValue } from "~/lib/utils";
 
 interface Device {
     id: number;
@@ -20,18 +21,6 @@ interface QueueItem {
     status: string;
     queued_at: string;
     parameters?: Record<string, any>;
-}
-
-function formatParameterValue(value: any): string {
-    if (value === null || value === undefined) return "-";
-    if (typeof value === "boolean") return value ? "Yes" : "No";
-    if (Array.isArray(value)) return value.map(formatParameterValue).join(", ");
-    if (typeof value === "object") {
-        return Object.entries(value)
-            .map(([key, nestedValue]) => `${key}: ${formatParameterValue(nestedValue)}`)
-            .join(", ");
-    }
-    return String(value);
 }
 
 export default function QueuePage() {
@@ -162,23 +151,24 @@ export default function QueuePage() {
                                             return sortOrder === 'newest' ? b.queue_id - a.queue_id : a.queue_id - b.queue_id;
                                         })
                                         .map(item => (
-                                            <div key={item.queue_id} className="p-3 border-l-4 flex justify-between items-center">
+                                            <div key={item.queue_id} className="p-3 border-l-4 flex justify-between items-start">
                                                 <div>
                                                     <div className="flex gap-2 items-center mb-1">
                                                         <span className="font-semibold">Queue ID: {item.queue_id}</span>
                                                         <Badge variant={item.status as any}>{item.status.toUpperCase()}</Badge>
                                                     </div>
                                                     <div className="text-xs text-gray-500">
-                                                        Command: {item.command_name} | Queued: {new Date(item.queued_at).toLocaleString()}
+                                                        Command: <span className="font-semibold text-foreground">{item.command_name}</span> | Queued: {new Date(item.queued_at).toLocaleString()}
                                                     </div>
                                                     {item.parameters && Object.keys(item.parameters).length > 0 && (
-                                                        <div className="text-xs text-gray-400 mt-1 space-y-1 border-l-4 pl-2">
-                                                            {Object.entries(item.parameters).map(([key, value]) => (
-                                                                <div key={key}>
-                                                                    <span className="font-medium text-gray-500">{key}:</span> {formatParameterValue(value)}
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                                        <><span className="block mt-2">Body</span>
+                                                            <div className="text-xs text-gray-400 mt-1 space-y-1 border-l-4 pl-2">
+                                                                {Object.entries(item.parameters).map(([key, value]) => (
+                                                                    <div key={key}>
+                                                                        <span className="font-medium text-gray-500">{key}:</span> {formatParameterValue(value)}
+                                                                    </div>
+                                                                ))}
+                                                            </div></>
                                                     )}
                                                 </div>
                                                 <div>

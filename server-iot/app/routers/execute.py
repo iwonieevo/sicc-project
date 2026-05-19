@@ -119,7 +119,9 @@ def get_execution_logs(limit: int = 50):
             {
                 "queue_id": log.queue_id,
                 "device_id": log.device_id,
+                "device_name": log.device_name,
                 "command_id": log.command_id,
+                "command_name": log.command_name,
                 "parameters": log.parameters,
                 "status": log.status,
                 "result": log.result,
