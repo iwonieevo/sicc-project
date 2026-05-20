@@ -16,6 +16,7 @@ interface Device {
 interface QueueItem {
     queue_id: number;
     device_id: number;
+    device_name: string;
     command_id: number;
     command_name: string;
     status: string;
