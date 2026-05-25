@@ -63,6 +63,11 @@ class ExecuteCommandRequest(BaseModel):
     parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
+class ExecuteAnyCommandRequest(BaseModel):
+    command_id: int
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ExecuteCommandResponse(BaseModel):
     queue_id: int
     status_url: str = "/api/status/{queue_id}"

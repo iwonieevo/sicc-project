@@ -13,6 +13,7 @@ from app.schemas import (
     ResultCallbackRequest,
     QueueItemResponse,
     QueueCancelResponse,
+    ExecuteAnyCommandRequest,
 )
 from app.auth import get_current_user
 
@@ -117,6 +118,63 @@ def execute_command(
         method="POST",
         path="/execute",
         json_data=model_to_dict(request),
+    )
+
+    if not response_data:
+        raise HTTPException(status_code=502, detail="IoT server did not return a response")
+
+    queue_id = response_data["queue_id"]
+
+    return ExecuteCommandResponse(
+        queue_id=queue_id,
+        status_url=f"/api/status/{queue_id}",
+    )
+
+@router.post("/execute/any", response_model=ExecuteCommandResponse)
+def execute_command_any_agent(
+    request: ExecuteAnyCommandRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    devices = forward_to_server("GET", "/devices")
+
+    available_devices = [
+        device for device in devices
+        if device["status"] in ("online", "busy")
+    ]
+
+    if not available_devices:
+        raise HTTPException(status_code=404, detail="No available agents")
+
+    device_loads = []
+
+    for device in available_devices:
+        queue = forward_to_server(
+            method="GET",
+            path=f"/devices/{device['id']}/queue",
+        )
+
+        active_count = sum(
+            1 for item in queue
+            if item["status"] in ("queued", "running")
+        )
+
+        device_loads.append({
+            "device_id": device["id"],
+            "active_count": active_count,
+        })
+
+    selected = min(device_loads, key=lambda item: item["active_count"])
+
+    payload = {
+        "device_id": selected["device_id"],
+        "command_id": request.command_id,
+        "parameters": request.parameters,
+    }
+
+    response_data = forward_to_server(
+        method="POST",
+        path="/execute",
+        json_data=payload,
     )
 
     if not response_data:
