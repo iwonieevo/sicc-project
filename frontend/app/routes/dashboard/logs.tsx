@@ -4,11 +4,14 @@ import { Navigate } from "react-router";
 import { useAuth } from "~/providers/AuthProvider";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { formatParameterValue } from "~/lib/utils";
 
 interface CommandLog {
   queue_id: number;
   device_id: number;
+  device_name: string;
   command_id: number;
+  command_name: string;
   parameters?: Record<string, any>;
   status: 'queued' | 'running' | 'done' | 'error';
   result?: string;
@@ -87,7 +90,7 @@ export default function Page() {
                   Loading...
                 </Button>
               ) : (
-                <Button variant="link" className="text-foreground" onClick={fetchLogs}>
+                <Button variant="link" className="text-foreground" onClick={() => fetchLogs()}>
                   Reload
                 </Button>
               )}
@@ -100,18 +103,26 @@ export default function Page() {
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex flex-wrap gap-2">
                       <span className="font-semibold">Queue: {log.queue_id}</span>
-                      <span className="text-sm text-gray-500">Device: {log.device_id}</span>
-                      <span className="text-sm text-gray-500">Command: {log.command_id}</span>
                     </div>
                     <Badge variant={log.status}>
                       {log.status.toUpperCase()}
                     </Badge>
                   </div>
+                  <div className="flex gap-4 mb-2">
+                    <span className="text-sm text-gray-500">Device: <span className="font-semibold text-foreground">{log.device_name}</span></span>
+                    <span className="text-sm text-gray-500">Command: <span className="font-semibold text-foreground">{log.command_name}</span></span>
+                  </div>
 
                   {log.parameters && Object.keys(log.parameters).length > 0 && (
-                    <div className="text-xs text-gray-500 mb-2">
-                      Parameters: {JSON.stringify(log.parameters)}
-                    </div>
+
+                    <><span>Body</span>
+                      <div className="text-xs text-gray-400 mt-1 space-y-1 border-l-4 pl-2 mb-2">
+                        {Object.entries(log.parameters).map(([key, value]) => (
+                          <div key={key}>
+                            <span className="font-medium text-gray-500">{key}:</span> {formatParameterValue(value)}
+                          </div>
+                        ))}
+                      </div></>
                   )}
 
                   <div className="text-xs text-gray-400 space-x-4">
