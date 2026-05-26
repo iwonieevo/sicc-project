@@ -109,11 +109,19 @@ def get_command_status(queue_id: int):
 @router.get("/logs")
 def get_execution_logs(limit: int = 50):
     """Get command execution history."""
+
+    if limit < 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Limit must be a non-negative integer."
+        )
     db = SessionLocal()
     try:
-        logs = db.query(VCommandLog).order_by(
-            VCommandLog.queued_at.desc()
-        ).limit(limit).all()
+        query = db.query(VCommandLog).order_by(VCommandLog.queued_at.desc())
+        
+        if limit > 0:
+            query = query.limit(limit)
+        logs = query.all()
 
         return [
             {
