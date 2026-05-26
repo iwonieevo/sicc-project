@@ -4,7 +4,7 @@ import logging
 
 from app.database import SessionLocal
 from app.models import Device, Command, CommandParameter, CommandQueue, CommandExecution, CommandResult
-from app.schemas import RegisterRequest, RegisterResponse, CallbackRequest, PollCommandResponse
+from app.schemas import RegisterRequest, RegisterResponse, CallbackRequest 
 from app.utility import build_function
 
 
@@ -23,6 +23,10 @@ def register_agent(data: RegisterRequest):
             if device.is_deleted:
                 logger.warning(f"Deleted device '{data.name}' attempted re-registration")
                 raise HTTPException(status_code=400, detail="Device has been deleted")
+            
+            if device.status == "online":
+                logger.warning(f"Already online device '{data.name}' attempted registration")
+                raise HTTPException(status_code=400, detail="Device is already online")
             
             device.status = "online"
             device.last_seen = datetime.now(timezone.utc)

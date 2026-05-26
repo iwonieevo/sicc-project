@@ -11,6 +11,8 @@ from app.schemas import (
     ExecuteCommandResponse,
     CommandCreateRequest,
     ResultCallbackRequest,
+    QueueItemResponse,
+    QueueCancelResponse,
 )
 from app.auth import get_current_user
 
@@ -117,6 +119,9 @@ def execute_command(
         json_data=model_to_dict(request),
     )
 
+    if not response_data:
+        raise HTTPException(status_code=502, detail="IoT server did not return a response")
+
     queue_id = response_data["queue_id"]
 
     return ExecuteCommandResponse(
@@ -170,4 +175,31 @@ def receive_result(request: ResultCallbackRequest):
         method="POST",
         path="/result",
         json_data=model_to_dict(request),
+    )
+
+@router.get("/devices/{device_id}/queue", response_model=list[QueueItemResponse])
+def get_device_queue(
+    device_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get the queue for a selected device.
+    """
+    return forward_to_server(
+        method="GET",
+        path=f"/devices/{device_id}/queue",
+    )
+
+@router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)
+def cancel_queue_task(
+    device_id: int,
+    queue_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Cancel a queued command for a selected device.
+    """
+    return forward_to_server(
+        method="POST",
+        path=f"/devices/{device_id}/queue/{queue_id}/cancel",
     )

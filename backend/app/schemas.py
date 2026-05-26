@@ -36,15 +36,6 @@ class CommandParameterResponse(BaseModel):
     default_value: Optional[str] = None
     description: Optional[str] = None
 
-
-class CommandParameterRequest(BaseModel):
-    name: str
-    param_type: str = "text"
-    is_required: bool = True
-    default_value: Optional[str] = None
-    description: Optional[str] = None
-
-
 # Command schemas
 class CommandResponse(BaseModel):
     id: int
@@ -95,3 +86,19 @@ class ResultCallbackRequest(BaseModel):
     queue_id: int
     is_error: bool
     result: Optional[str] = None
+
+
+# Queue schemas
+class QueueItemResponse(BaseModel):
+    queue_id: int
+    command_id: int
+    command_name: str
+    parameters: Optional[Dict[str, Any]] = None
+    status: str
+    queued_at: str
+    can_cancel: bool 
+
+class QueueCancelResponse(BaseModel):
+    status: str
+    device_id: int
+    queue_id: int 

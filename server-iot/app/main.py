@@ -3,7 +3,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 
-from app.routers import devices, commands, agent, execute
+from app.routers import devices, commands, agent, execute, queue
 from app.database import SessionLocal
 from app.models import Device
 
@@ -59,6 +59,7 @@ app.include_router(devices.router)
 app.include_router(commands.router)
 app.include_router(agent.router)
 app.include_router(execute.router)
+app.include_router(queue.router)
 
 
 @app.on_event("startup")

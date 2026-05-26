@@ -10,6 +10,7 @@ This document describes the security measures applied at every layer of the syst
 ## Authorization
 
 User entries are stored in the database in a table with following columns:
+
 - `id` - A random UUIDv4
 - `username` - Plaintext username
 - `password` - The hashed password of the username. Computed with argon2id
@@ -59,9 +60,12 @@ As keys are ephemeral per session, random 96-bit nonces are safe from collision 
 
 As mentioned before, passwords and TOTP secrets are never stored in plaintext. Sensitive columns (for instance, execution results) are encrypted at column level with AES-256-GCM with appropriate keys.
 
+Database connections use TLS with a local self-signed CA. PostgreSQL presents a server certificate signed by this CA, and backend services verify it with `sslmode=verify-full`.
+
 # Logs
 
 As mentioned, we take additional precautions against even ourselves to ensure logs cannot be tampered with. A compromised admin could otherwise silently modify or delete plaintext audit log entries. All audit log entries are therefore hash-chained, making tampering mathematically detectable:
+
 ```
 [1] = { data, hash: HMAC-SHA256(key, data) },
 [2] = { data, hash: HMAC-SHA256(key, data | prev_hash) }
@@ -83,12 +87,14 @@ Editing any entry breaks every hash that follows it.
 3. CORS headers locked to the exact frontend origin.
 4. All user input and server output is strictly sanitized before rendering.
 5. Security headers are set on all responses:
+
 ```
 X-Frame-Options: DENY             # protects against "clickjacking"
 X-Content-Type-Options: nosniff   # protects against MIME confusion attacks
 Referrer-Policy: no-referrer      # protects against potential data leakage
 Content-Security-Policy: <policy> # a strict allowlist for the website, a good XSS precaution
 ```
+
 6. Failed authentication return a generic error message, not a specialized one - "invalid credentials" over "this username already exists" to prevent enumeration attacks.
 7. Any manual comparisons on the backend must be done with cryptographically secure functions to prevent timing attacks.
 8. Never reimplement cryptographic algorithms. Use only well established, audited dependencies.
