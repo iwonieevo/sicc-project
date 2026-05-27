@@ -7,9 +7,16 @@ from app.schemas import QueueItemResponse, QueueCancelResponse
 
 router = APIRouter()
 
+
 @router.get("/devices/{device_id}/queue", response_model=list[QueueItemResponse])
-def get_device_queue(device_id: int):
+def get_device_queue(device_id: int, limit: int = 50):
     """Get command queue for selected device"""
+
+    if limit < 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Limit must be a non-negative integer."
+        )
     db = SessionLocal()
     try:
         device = db.query(Device).filter(
@@ -23,11 +30,15 @@ def get_device_queue(device_id: int):
                 detail="Device not found"
             )
         
-        log_items = db.query(VCommandLog).filter(
+        query = db.query(VCommandLog).filter(
             VCommandLog.device_id == device_id
         ).order_by(
             VCommandLog.queued_at
-        ).all()
+        )
+
+        if limit > 0:
+            query = query.limit(limit)
+        logs = query.all()
 
         return [
             QueueItemResponse(
@@ -39,8 +50,7 @@ def get_device_queue(device_id: int):
                 queued_at=str(log.queued_at),
                 can_cancel=log.status == "queued"
             )
-
-            for log in log_items
+            for log in logs
         ]
     
     finally:

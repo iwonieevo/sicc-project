@@ -19,7 +19,7 @@ from app.auth import get_current_user
 
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["commands"])
 
@@ -78,7 +78,7 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
         raise
 
     except requests.RequestException as e:
-        logger.error(f"Failed to forward request to IoT server: {e}")
+        LOGGER.error(f"Failed to forward request to IoT server: {e}")
         raise HTTPException(
             status_code=503,
             detail="IoT server unavailable",

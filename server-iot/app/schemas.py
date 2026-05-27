@@ -34,6 +34,7 @@ class DeviceResponse(BaseModel):
     status: str
     last_seen: Optional[datetime]
 
+
 class CommandParameterResponse(BaseModel):
     id: int
     name: str
@@ -42,6 +43,7 @@ class CommandParameterResponse(BaseModel):
     default_value: Optional[str]
     description: Optional[str]
 
+
 class CommandParameterRequest(BaseModel):
     name: str
     param_type: str = "text"
@@ -49,11 +51,13 @@ class CommandParameterRequest(BaseModel):
     default_value: Optional[str] = None
     description: Optional[str] = None
 
+
 class CommandResponse(BaseModel):
     id: int
     name: str
     description: Optional[str]
     parameters: List[CommandParameterResponse]
+
 
 class CommandStatusResponse(BaseModel):
     queue_id: int
@@ -67,15 +71,18 @@ class CommandStatusResponse(BaseModel):
     result: Optional[str]
     status: str
 
+
 class PollCommandResponse(BaseModel):
-    queue_id: int
-    function_code: str
-    parameters: Dict[str, Any]
+    queue_id: Optional[int]
+    function_code: Optional[str]
+    parameters: Optional[Dict[str, Any]]
+
 
 class CommandCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     python_code: str
+
 
 class QueueItemResponse(BaseModel):
     queue_id: int

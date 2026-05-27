@@ -7,8 +7,9 @@ from app.schemas import ExecuteRequest, ExecuteResponse, CommandStatusResponse
 
 from app.sanitization import sanitize_parameters
 
+
 router = APIRouter()
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 @router.post("/execute", response_model=ExecuteResponse)
@@ -68,7 +69,7 @@ async def execute_command(request: ExecuteRequest):
         db.commit()
         db.refresh(queue)
         
-        logger.info(f"Command queued: device={request.device_id}, command={request.command_id}, queue_id={queue.id}")
+        LOGGER.info(f"Command queued: device={request.device_id}, command={request.command_id}, queue_id={queue.id}")
         return ExecuteResponse(queue_id=queue.id)
         
     except HTTPException:
@@ -76,7 +77,7 @@ async def execute_command(request: ExecuteRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Execute error: {e}")
+        LOGGER.error(f"Execute error: {e}")
         raise HTTPException(status_code=500, detail="Failed to queue command")
     finally:
         db.close()
@@ -109,11 +110,19 @@ def get_command_status(queue_id: int):
 @router.get("/logs")
 def get_execution_logs(limit: int = 50):
     """Get command execution history."""
+
+    if limit < 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Limit must be a non-negative integer."
+        )
     db = SessionLocal()
     try:
-        logs = db.query(VCommandLog).order_by(
-            VCommandLog.queued_at.desc()
-        ).limit(limit).all()
+        query = db.query(VCommandLog).order_by(VCommandLog.queued_at.desc())
+        
+        if limit > 0:
+            query = query.limit(limit)
+        logs = query.all()
 
         return [
             {
