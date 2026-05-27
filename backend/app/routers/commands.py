@@ -35,7 +35,6 @@ def model_to_dict(model):
 
 
 def build_server_url(path: str) -> str:
- 
     return f"{IOT_SERVER_URL.rstrip('/')}{path}"
 
 
@@ -90,7 +89,6 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
 def list_devices(
     current_user: dict = Depends(get_current_user),
 ):
-
     return forward_to_server(
         method="GET",
         path="/devices",
@@ -101,7 +99,6 @@ def list_devices(
 def list_commands(
     current_user: dict = Depends(get_current_user),
 ):
-
     return forward_to_server(
         method="GET",
         path="/commands",
@@ -113,7 +110,6 @@ def execute_command(
     request: ExecuteCommandRequest,
     current_user: dict = Depends(get_current_user),
 ):
-
     response_data = forward_to_server(
         method="POST",
         path="/execute",
@@ -137,6 +133,9 @@ def execute_command_any_agent(
 ):
     devices = forward_to_server("GET", "/devices")
 
+    if not isinstance(devices, list):
+        raise HTTPException(status_code=404, detail="No devices found")
+
     available_devices = [
         device for device in devices
         if device["status"] in ("online", "busy")
@@ -152,6 +151,9 @@ def execute_command_any_agent(
             method="GET",
             path=f"/devices/{device['id']}/queue",
         )
+
+        if not isinstance(queue, list):
+            raise HTTPException(status_code=500, detail=f"Error recovering queue for device_id{device['id']}")
 
         active_count = sum(
             1 for item in queue
@@ -238,6 +240,7 @@ def receive_result(request: ResultCallbackRequest):
 @router.get("/devices/{device_id}/queue", response_model=list[QueueItemResponse])
 def get_device_queue(
     device_id: int,
+    limit: int = 50,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -246,6 +249,7 @@ def get_device_queue(
     return forward_to_server(
         method="GET",
         path=f"/devices/{device_id}/queue",
+        params={"limit": limit},
     )
 
 @router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)
