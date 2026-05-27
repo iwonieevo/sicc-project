@@ -3,7 +3,9 @@ from app.database import SessionLocal
 from app.models import Device
 from app.schemas import DeviceResponse
 
+
 router = APIRouter()
+
 
 @router.get("/devices", response_model=list[DeviceResponse])
 def get_devices():

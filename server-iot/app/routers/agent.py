@@ -4,33 +4,30 @@ import logging
 
 from app.database import SessionLocal
 from app.models import Device, Command, CommandParameter, CommandQueue, CommandExecution, CommandResult
-from app.schemas import RegisterRequest, RegisterResponse, CallbackRequest 
+from app.schemas import RegisterRequest, RegisterResponse, CallbackRequest, PollCommandResponse
 from app.utility import build_function
 
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 @router.post("/agent/register", response_model=RegisterResponse)
 def register_agent(data: RegisterRequest):
-    """Register new agent or restore existing one. Sets status to online."""
+    """Registers a new agent or restores online status for an existing one. Returns device_id and registration status."""
     db = SessionLocal()
     try:
         device = db.query(Device).filter(Device.name == data.name).first()
         
         if device:
             if device.is_deleted:
-                logger.warning(f"Deleted device '{data.name}' attempted re-registration")
+                LOGGER.warning(f"Registration attempt rejected for deleted device: '{data.name}'")
                 raise HTTPException(status_code=400, detail="Device has been deleted")
-            
-            if device.status == "online":
-                logger.warning(f"Already online device '{data.name}' attempted registration")
-                raise HTTPException(status_code=400, detail="Device is already online")
             
             device.status = "online"
             device.last_seen = datetime.now(timezone.utc)
             db.commit()
+            LOGGER.info(f"Device restored to online: '{data.name}' (ID: {device.id})")
             return RegisterResponse(device_id=device.id, status="restored")
         
         device = Device(name=data.name, status="online")
@@ -38,24 +35,15 @@ def register_agent(data: RegisterRequest):
         db.commit()
         db.refresh(device)
         
-        logger.info(f"New device registered: id={device.id}, name={device.name}")
+        LOGGER.info(f"New device registered: '{data.name}' (ID: {device.id})")
         return RegisterResponse(device_id=device.id, status="registered")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Registration error: {e}")
-        raise HTTPException(status_code=500, detail="Registration failed")
     finally:
         db.close()
 
 
-@router.get("/agent/{device_id}/commands")
+@router.get("/agent/{device_id}/commands", response_model=PollCommandResponse)
 def poll_commands(device_id: int):
-    """
-    Return next pending command for device, or empty response if none available.
-    Does not return 404 - empty response indicates no commands.
-    """
+    """Checks device status and returns the next pending task from the execution queue, if available."""
     db = SessionLocal()
     try:
         device = db.query(Device).filter(
@@ -67,71 +55,76 @@ def poll_commands(device_id: int):
             raise HTTPException(status_code=404, detail="Device not found")
         
         device.last_seen = datetime.now(timezone.utc)
-        device.status = "online"
-        db.commit()
         
+        if device.status == "busy":
+            db.commit()
+            return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
+
         queue = db.query(CommandQueue).outerjoin(
             CommandExecution, CommandQueue.id == CommandExecution.queue_id
         ).filter(
             CommandQueue.device_id == device_id,
             CommandExecution.queue_id == None
         ).order_by(CommandQueue.queued_at).first()
-        
+
         if not queue:
-            return {}
-        
+            device.status = "online"
+            db.commit()
+            return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
+
         command = db.query(Command).filter(
             Command.id == queue.command_id,
             Command.is_deleted == False
         ).first()
-        
+
         if not command:
-            logger.warning(f"Command {queue.command_id} not found for queue {queue.id}")
-            return {}
-        
+            LOGGER.warning(f"Queue entry {queue.id} references a missing or deleted command (ID: {queue.command_id}), skipping.")
+            device.status = "online"
+            db.commit()
+            return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
+
         params = db.query(CommandParameter).filter(
             CommandParameter.command_id == command.id,
             CommandParameter.is_deleted == False
         ).all()
-        
+
         function_code = build_function(command.python_code, [p.name for p in params])
-        
+
         execution = CommandExecution(queue_id=queue.id)
         db.add(execution)
         device.status = "busy"
         db.commit()
-        
-        return {
-            "queue_id": queue.id,
-            "function_code": function_code,
-            "parameters": queue.parameters or {}
-        }
-        
+
+        LOGGER.info(f"Task dispatched to device ID {device_id} (Queue ID: {queue.id}, Command ID: {command.id})")
+        return PollCommandResponse(
+            queue_id=queue.id,
+            function_code=function_code,
+            parameters=queue.parameters or {}
+        )
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Poll error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve commands")
+        LOGGER.error(f"Error polling commands for device ID {device_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         db.close()
 
 
 @router.post("/agent/callback")
 def receive_callback(data: CallbackRequest):
-    """Receive and store command execution result."""
+    """Records the execution result reported by an agent and restores its online status."""
     db = SessionLocal()
     try:
         queue = db.query(CommandQueue).filter(CommandQueue.id == data.queue_id).first()
         if not queue:
             raise HTTPException(status_code=404, detail="Queue entry not found")
         
-        device = db.query(Device).filter(
-            Device.id == queue.device_id,
-            Device.is_deleted == False
-        ).first()
-        
+        device = db.query(Device).filter(Device.id == queue.device_id).first()
         if not device:
-            raise HTTPException(status_code=404, detail="Device not found")
+            LOGGER.warning(f"Device not found when processing callback for Queue ID {data.queue_id} (Device ID: {queue.device_id})")
+        else:
+            device.status = "online"
         
         result = CommandResult(
             queue_id=data.queue_id,
@@ -140,16 +133,17 @@ def receive_callback(data: CallbackRequest):
         )
         db.add(result)
         
-        device.last_seen = datetime.now(timezone.utc)
-        device.status = "online"
         db.commit()
-        
-        return {"status": "acknowledged"}
+
+        if data.is_error:
+            LOGGER.warning(f"Task reported failure (Queue ID: {data.queue_id}): {data.result}")
+        else:
+            LOGGER.info(f"Task result acknowledged (Queue ID: {data.queue_id})")
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Callback error: {e}")
+        LOGGER.error(f"Error processing callback for Queue ID {data.queue_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to process callback")
     finally:
         db.close()
