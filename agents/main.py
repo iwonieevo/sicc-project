@@ -11,15 +11,15 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s: %(message)s'
 )
-LOGGER = logging.getLogger(__name__)
-
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
 class Config:
-    """Konfiguracja agenta IoT ładowana ze zmiennych środowiskowych."""
+    """IoT agent configuration loaded from environment variables."""
     agent_name: str
     iot_server_url: str
     poll_interval: int
@@ -28,7 +28,7 @@ class Config:
 
     @classmethod
     def from_env(cls) -> "Config":
-        """Tworzy instancję konfiguracji na podstawie zmiennych środowiskowych."""
+        """Creates a Config instance from environment variables, falling back to defaults."""
         return cls(
             agent_name=os.getenv("AGENT_NAME", socket.gethostname()),
             iot_server_url=os.getenv("IOT_SERVER_URL", "http://iot-server:7000"),
@@ -38,35 +38,47 @@ class Config:
 
 @dataclass
 class CommandTask:
-    """Struktura danych reprezentująca zadanie odebrane z serwera IoT.""" 
+    """Represents a task received from the IoT server.""" 
     queue_id: int
     function_code: str
     parameters: Dict[str, Any]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CommandTask":
-        """Inicjalizuje obiekt zadania na podstawie słownika."""
+        """Constructs a CommandTask from a dictionary, validating required fields.
+
+        Raises ValueError if queue_id is missing or not an integer, or if function_code
+        is missing or not a string.
+        """
+        queue_id = data.get("queue_id")
+        if not isinstance(queue_id, int) or isinstance(queue_id, bool):
+            raise ValueError(f"'queue_id' must be an integer, got: {type(queue_id).__name__}")
+
+        function_code = data.get("function_code")
+        if not isinstance(function_code, str):
+            raise ValueError(f"'function_code' must be a string, got: {type(function_code).__name__}")
+
         return cls(
-            queue_id=data["queue_id"],
-            function_code=data.get("function_code", ""),
-            parameters=data.get("parameters", {})
+            queue_id=queue_id,
+            function_code=function_code,
+            parameters=data.get("parameters", {}),
         )
 
 
 @dataclass
 class ExecutionResult:
-    """Struktura przechowująca wynik wykonania skryptu przez agenta."""
+    """Holds the result of a command execution, including success status and output."""
     queue_id: int
     is_error: bool
     result: str
 
     def to_dict(self) -> Dict[str, Any]:
-        """Konwertuje obiekt wyniku na słownik gotowy do wysyłki JSON."""
+        """Returns the execution result as a dictionary suitable for JSON serialization."""
         return asdict(self)
 
 
 class Agent:
-    """Zarządza pracą agenta IoT, łącząc pętlę nasłuchu z bezpieczną egzekucją kodu."""
+    """Manages the IoT agent lifecycle, combining a polling loop with sandboxed code execution."""
 
     __ALLOWED_BUILTINS: ClassVar[Dict[str, Any]] = {
         'ArithmeticError': ArithmeticError,
@@ -142,7 +154,7 @@ class Agent:
     __ALLOWED_MODULES: ClassVar[List[str]] = ['time', 'math']
     
     def __init__(self, config: Config):
-        """Inicjalizuje agenta, ustawiając klienta HTTP oraz bezpieczne środowisko wykonawcze."""
+        """Initializes the agent with an HTTP client and a sandboxed execution environment."""
         self.config = config
         self.device_id: Optional[int] = None
         self.client = httpx.AsyncClient(timeout=config.request_timeout)
@@ -151,7 +163,7 @@ class Agent:
 
     @classmethod
     def build_exec_globals(cls) -> Dict:
-        """Tworzy bazowy słownik zmiennych globalnych z ograniczonym dostępem do wbudowanych funkcji i modułów."""
+        """Builds a globals dictionary with restricted builtins and a module import guard limited to allowed modules."""
         def __restricted_import__(name, globals=None, locals=None, fromlist=(), level=0):
             if name.split('.')[0] in cls.__ALLOWED_MODULES:
                 return __import__(name, globals, locals, fromlist, level)
@@ -162,7 +174,7 @@ class Agent:
         return exec_globals
         
     async def register(self) -> bool:
-        """Rejestruje agenta na serwerze IoT w celu uzyskania unikalnego identyfikatora device_id."""
+        """Registers the agent with the IoT server to obtain a `device_id`. Retries with exponential backoff. Returns `True` on success."""
         for attempt in range(1, self.config.registration_retries + 1):
             try:
                 response = await self.client.post(
@@ -172,13 +184,15 @@ class Agent:
                 response.raise_for_status()
                 self.device_id = response.json()["device_id"]
                 return True
-            except Exception:
+            except Exception as e:
+                LOGGER.warning(f"Registration attempt {attempt}/{self.config.registration_retries} failed: {e}")
                 await asyncio.sleep(2 ** min(attempt - 1, 3))
         return False
 
     async def heartbeat_loop(self):
-        """Cyklicznie odpytuje serwer IoT i przekazuje nowe zadania do kolejki wykonawczej."""
+        """Polls the IoT server at regular intervals and enqueues any received tasks."""
         if self.device_id is None:
+            LOGGER.error("Heartbeat loop started without a valid device_id. Aborting.")
             return
         
         while True:
@@ -191,34 +205,40 @@ class Agent:
                 
                 if response_data.get('queue_id') is not None:
                     await self.task_queue.put(CommandTask.from_dict(response_data))
+            except ValueError as e:
+                LOGGER.error(f"Invalid task payload received, skipping: {e}")
             except Exception as e:
-                LOGGER.error(f"Błąd komunikacji z serwerem (heartbeat): {e}")
+                LOGGER.error(f"Heartbeat communication error: {e}")
             finally:
                 await asyncio.sleep(self.config.poll_interval)
 
     async def worker_loop(self):
-        """Pobiera zadania z kolejki, uruchamia je i przesyła wyniki z powrotem na serwer."""
+        """Continuously dequeues tasks, executes them, and sends results back to the server."""
         while True:
             task = await self.task_queue.get()
             try:
                 execution_result = await self.execute_command(task)
+                if execution_result.is_error:
+                    LOGGER.warning(f"Task failed (Queue ID: {task.queue_id}): {execution_result.result}")
+                else:
+                    LOGGER.info(f"Task completed successfully (Queue ID: {task.queue_id})")
                 await self.send_callback(execution_result)
             except Exception as e:
-                LOGGER.critical(f"Krytyczna awaria pętli wykonawczej (Worker): {e}")
+                LOGGER.error(f"Unexpected error processing task (Queue ID: {task.queue_id}): {e}")
             finally:
                 self.task_queue.task_done()
 
     async def execute_command(self, task: CommandTask) -> ExecutionResult:
-        """Uruchamia otrzymany kod Pythona w odizolowanym i bezpiecznym środowisku (sandbox)."""
+        """Executes the task's Python code inside a sandboxed environment and returns an `ExecutionResult`."""
         result_payload = ExecutionResult(queue_id=task.queue_id, is_error=False, result="")
+        LOGGER.info(f"Executing task (Queue ID: {task.queue_id})")
         try:
             local_env = {}
-            # Kopia słownika chroni przed współdzieleniem stanu błędu / ucieczką pamięci
             scoped_globals = self.__exec_globals.copy()
             
             exec(task.function_code, scoped_globals, local_env)
             if "_sicc_command" not in local_env:
-                raise Exception("Funkcja '_sicc_command' nie została zdefiniowana w kodzie")
+                raise Exception("Function '_sicc_command' was not defined in the submitted code")
             
             result_payload.result = str(local_env["_sicc_command"](**task.parameters))
         except Exception as e:
@@ -227,23 +247,23 @@ class Agent:
         return result_payload
 
     async def send_callback(self, result: ExecutionResult):
-        """Wysyła raport z wynikiem wykonania zadania z powrotem do serwera IoT."""
+        """Posts the execution result back to the IoT server callback endpoint."""
         try:
             await self.client.post(
-                f"{self.config.iot_server_url}/agent/callback", 
+                f"{self.config.iot_server_url}/agent/callback",
                 json=result.to_dict()
             )
         except Exception as e:
-            LOGGER.error(f"Nie udało się wysłać statusu wykonania (Queue ID: {result.queue_id}): {e}")
+            LOGGER.error(f"Failed to send execution result (Queue ID: {result.queue_id}): {e}")
 
     async def run(self):
-        """Uruchamia proces rejestracji oraz współbieżne pętle nasłuchu i wykonawczą."""
-        LOGGER.info(f"Uruchamianie agenta IoT: '{self.config.agent_name}'")
+        """Registers the agent and runs the heartbeat and worker loops concurrently."""
+        LOGGER.info(f"Starting IoT agent: '{self.config.agent_name}'")
         if not await self.register():
-            LOGGER.critical("Rejestracja odrzucona przez serwer. Wyłączanie agenta.")
+            LOGGER.critical("Registration failed after all retries. Shutting down.")
             return
         
-        LOGGER.info(f"Agent zarejestrowany pomyślnie. Przypisane ID: {self.device_id}")
+        LOGGER.info(f"Agent registered successfully. Assigned ID: {self.device_id}")
         try:
             await asyncio.gather(
                 self.heartbeat_loop(),
@@ -253,11 +273,11 @@ class Agent:
             pass
         finally:
             await self.client.aclose()
-            LOGGER.info("Agent został bezpiecznie wyłączony.")
+            LOGGER.info("Agent shut down cleanly.")
 
 
 async def main():
-    """Główny punkt wejścia do aplikacji inicjalizujący asynchronicznego agenta."""
+    """Entry point: loads config from environment and runs the agent."""
     config = Config.from_env()
     agent = Agent(config)
     await agent.run()

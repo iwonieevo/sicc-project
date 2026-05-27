@@ -3,7 +3,6 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 
 
-# Auth schemas
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
@@ -19,7 +18,6 @@ class TokenResponse(BaseModel):
     token_type: str
 
 
-# Device schemas
 class DeviceResponse(BaseModel):
     id: int
     name: str
@@ -27,7 +25,6 @@ class DeviceResponse(BaseModel):
     last_seen: Optional[datetime] = None
 
 
-# Command parameter schemas
 class CommandParameterResponse(BaseModel):
     id: int
     name: str
@@ -36,7 +33,7 @@ class CommandParameterResponse(BaseModel):
     default_value: Optional[str] = None
     description: Optional[str] = None
 
-# Command schemas
+
 class CommandResponse(BaseModel):
     id: int
     name: str
@@ -56,7 +53,6 @@ class CommandUpdateRequest(BaseModel):
     python_code: Optional[str] = None
 
 
-# Execution schemas
 class ExecuteCommandRequest(BaseModel):
     device_id: int
     command_id: int
@@ -81,14 +77,12 @@ class CommandStatusResponse(BaseModel):
     finished_at: Optional[datetime] = None
 
 
-# IoT Server callback schemas
 class ResultCallbackRequest(BaseModel):
     queue_id: int
     is_error: bool
     result: Optional[str] = None
 
 
-# Queue schemas
 class QueueItemResponse(BaseModel):
     queue_id: int
     command_id: int
@@ -97,6 +91,7 @@ class QueueItemResponse(BaseModel):
     status: str
     queued_at: str
     can_cancel: bool 
+
 
 class QueueCancelResponse(BaseModel):
     status: str

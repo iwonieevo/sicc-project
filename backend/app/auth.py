@@ -13,7 +13,6 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_change_me_in_productio
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-# OAuth2 scheme - tokenUrl should match your login endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login", auto_error=False)
 
 

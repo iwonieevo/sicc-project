@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Text, DateTime, Boolean, ForeignKey, JSON
+from sqlalchemy import Column, BigInteger, Text, DateTime, Boolean
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -11,4 +11,3 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
     is_deleted = Column(Boolean, nullable=False, default=False)
-#deleted none used tables
