@@ -103,45 +103,63 @@ docker-compose -f docker-compose.agents.yml --profile alpha --profile beta up -d
 
 ---
 
-## Stopping the Project
+## Stopping & Resetting the Project
 
-### Stop everything
+### Stopping Execution (Safe & Graceful)
+
+Use `stop` for daily operations. It sends a `SIGTERM` signal allowing agents to close connections cleanly. It **preserves your database data and container states**, making subsequent startups instant.
+
+#### Stop everything
+
+```bash
+docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all stop
+```
+
+#### Stop infrastructure only (Agents will keep running and attempting to reconnect)
+
+```bash
+docker-compose -f docker-compose.infra.yml stop
+```
+
+#### Stop all agents cleanly
+
+```bash
+docker-compose -f docker-compose.agents.yml --profile all stop
+```
+
+#### Stop a specific agent
+
+```bash
+docker-compose -f docker-compose.agents.yml --profile alpha stop
+```
+
+#### Stop scaled dynamic agents (with profile "never")
+
+```bash
+docker-compose -f docker-compose.agents.yml --profile never stop
+```
+
+### Tearing Down (Destructive Reset)
+
+Use `down` only when you want to **wipe the temporary environment state** (e.g., pulling fresh agent base images, network debugging, or clearing dynamic scales).
+
+#### Tear down everything (Destroys containers and networks, but keeps database volumes intact)
 
 ```bash
 docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all down
 ```
 
-### Stop infrastructure only
+### Resetting the Database (Hard Factory Reset)
 
-```bash
-docker-compose -f docker-compose.infra.yml down
-```
+Use `down -v` to perform a total system wipe. This destroys the system containers, internal networks, and **permanently deletes the PostgreSQL volume data** - forcing a blank-slate schema creation on the next boot.
 
-### Stop all agents (leave infrastructure running)
-
-```bash
-docker-compose -f docker-compose.agents.yml --profile all down
-```
-
-### Stop a specific agent
-
-```bash
-docker-compose -f docker-compose.agents.yml --profile alpha down
-# or directly:
-docker stop agent-alpha && docker rm agent-alpha
-```
-
----
-
-## Resetting the Database
-
-Bring everything down and remove the volume:
+#### Wipe infrastructure and data volumes
 
 ```bash
 docker-compose -f docker-compose.infra.yml down -v
 ```
 
-Then start again:
+#### Rebuild and boot clean
 
 ```bash
 docker-compose -f docker-compose.infra.yml up -d --build

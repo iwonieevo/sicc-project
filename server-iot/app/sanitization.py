@@ -41,7 +41,7 @@ def sanitize_parameters(params: Dict[str, Any], param_definitions: List[Dict]) -
     Args:
         params: Dictionary of parameter name to value (user input)
         param_definitions: List of parameter definition dicts with 'name', 'param_type', 
-                          'is_required', and 'default_value'
+        'is_required', and 'default_value'
     
     Returns:
         Sanitized parameter dictionary with all parameters (defaults + overrides)

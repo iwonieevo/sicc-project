@@ -148,7 +148,6 @@ def get_command_status(
     queue_id: int,
     current_user: dict = Depends(get_current_user),
 ):
-
     return forward_to_server(
         method="GET",
         path=f"/status/{queue_id}",
@@ -160,7 +159,6 @@ def create_command(
     request: CommandCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-
     return forward_to_server(
         method="POST",
         path="/commands",
@@ -170,7 +168,6 @@ def create_command(
 
 @router.post("/result")
 def receive_result(request: ResultCallbackRequest):
-
     return forward_to_server(
         method="POST",
         path="/result",
@@ -180,6 +177,7 @@ def receive_result(request: ResultCallbackRequest):
 @router.get("/devices/{device_id}/queue", response_model=list[QueueItemResponse])
 def get_device_queue(
     device_id: int,
+    limit: int = 50,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -188,6 +186,7 @@ def get_device_queue(
     return forward_to_server(
         method="GET",
         path=f"/devices/{device_id}/queue",
+        params={"limit": limit},
     )
 
 @router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)

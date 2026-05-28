@@ -17,21 +17,27 @@ async def execute_command(request: ExecuteRequest):
     """Queue command for execution by specified device."""
     db = SessionLocal()
     try:
-        device = db.query(Device).filter(
+        device = db.query(
+            Device
+        ).filter(
             Device.id == request.device_id,
             Device.is_deleted == False
         ).first()
         if not device:
             raise HTTPException(status_code=404, detail="Device not found")
         
-        command = db.query(Command).filter(
+        command = db.query(
+            Command
+        ).filter(
             Command.id == request.command_id,
             Command.is_deleted == False
         ).first()
         if not command:
             raise HTTPException(status_code=404, detail="Command not found")
         
-        param_defs = db.query(CommandParameter).filter(
+        param_defs = db.query(
+            CommandParameter
+        ).filter(
             CommandParameter.command_id == request.command_id,
             CommandParameter.is_deleted == False
         ).all()
@@ -88,7 +94,12 @@ def get_command_status(queue_id: int):
     """Get current status and result of queued command."""
     db = SessionLocal()
     try:
-        log = db.query(VCommandLog).filter(VCommandLog.queue_id == queue_id).first()
+        log = db.query(
+            VCommandLog
+        ).filter(
+            VCommandLog.queue_id == queue_id
+        ).first()
+
         if not log:
             raise HTTPException(status_code=404, detail="Log not found")
         
@@ -118,7 +129,11 @@ def get_execution_logs(limit: int = 50):
         )
     db = SessionLocal()
     try:
-        query = db.query(VCommandLog).order_by(VCommandLog.queued_at.desc())
+        query = db.query(
+            VCommandLog
+        ).order_by(
+            VCommandLog.queued_at.desc()
+        )
         
         if limit > 0:
             query = query.limit(limit)

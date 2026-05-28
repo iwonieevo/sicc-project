@@ -83,3 +83,6 @@ logs/
 *.bak
 *~
 .DS_Store
+
+# Project files
+pyproject.toml

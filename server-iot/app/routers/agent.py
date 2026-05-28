@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
+from sqlalchemy import func
 import logging
 
 from app.database import SessionLocal
@@ -55,20 +56,19 @@ def poll_commands(device_id: int):
             raise HTTPException(status_code=404, detail="Device not found")
         
         device.last_seen = datetime.now(timezone.utc)
+        device.status = "online"
         
-        if device.status == "busy":
-            db.commit()
-            return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
-
-        queue = db.query(CommandQueue).outerjoin(
+        queue, execution_id = db.query(CommandQueue, CommandExecution.queue_id).outerjoin(
             CommandExecution, CommandQueue.id == CommandExecution.queue_id
+        ).outerjoin(
+            CommandResult, CommandQueue.id == CommandResult.queue_id
         ).filter(
             CommandQueue.device_id == device_id,
-            CommandExecution.queue_id == None
-        ).order_by(CommandQueue.queued_at).first()
+            func.coalesce(CommandExecution.is_cancelled, False) == False,
+            CommandResult.queue_id == None
+        ).order_by(CommandQueue.queued_at).first() or (None, None)
 
         if not queue:
-            device.status = "online"
             db.commit()
             return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
 
@@ -79,7 +79,6 @@ def poll_commands(device_id: int):
 
         if not command:
             LOGGER.warning(f"Queue entry {queue.id} references a missing or deleted command (ID: {queue.command_id}), skipping.")
-            device.status = "online"
             db.commit()
             return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
 
@@ -90,12 +89,14 @@ def poll_commands(device_id: int):
 
         function_code = build_function(command.python_code, [p.name for p in params])
 
-        execution = CommandExecution(queue_id=queue.id)
-        db.add(execution)
+        if not execution_id:
+            execution = CommandExecution(queue_id=queue.id)
+            db.add(execution)
+            
         device.status = "busy"
         db.commit()
 
-        LOGGER.info(f"Task dispatched to device ID {device_id} (Queue ID: {queue.id}, Command ID: {command.id})")
+        LOGGER.debug(f"Task dispatched to device ID {device_id} (Queue ID: {queue.id}, Command ID: {command.id})")
         return PollCommandResponse(
             queue_id=queue.id,
             function_code=function_code,
@@ -116,11 +117,15 @@ def receive_callback(data: CallbackRequest):
     """Records the execution result reported by an agent and restores its online status."""
     db = SessionLocal()
     try:
-        queue = db.query(CommandQueue).filter(CommandQueue.id == data.queue_id).first()
+        queue = db.query(CommandQueue).filter(
+            CommandQueue.id == data.queue_id
+        ).first()
         if not queue:
             raise HTTPException(status_code=404, detail="Queue entry not found")
         
-        device = db.query(Device).filter(Device.id == queue.device_id).first()
+        device = db.query(Device).filter(
+            Device.id == queue.device_id
+        ).first()
         if not device:
             LOGGER.warning(f"Device not found when processing callback for Queue ID {data.queue_id} (Device ID: {queue.device_id})")
         else:
