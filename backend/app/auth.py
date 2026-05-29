@@ -82,11 +82,11 @@ def get_current_user(
             return None
         raise credentials_exception
 
-        user = db.query(User).filter(User.email == email, User.is_deleted == False).first()
+    user = db.query(User).filter(User.email == email, User.is_deleted == False).first()
 
-        if user is None:
-            if optional:
-                return None
-            raise credentials_exception
+    if user is None:
+        if optional:
+            return None
+        raise credentials_exception
 
-        return {"email": user.email}
+    return {"email": user.email}

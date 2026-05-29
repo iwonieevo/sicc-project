@@ -46,23 +46,22 @@ def get_agent_names(running_only=False) -> list[str]:
 
 def cmd_start(args):
     for name in args.names:
-        print(f"Starting: {name}")
-        code = run_cmd(
-            [
-                "docker",
-                "compose",
-                "-f",
-                COMPOSE_FILE,
-                "-p",
-                COMPOSE_PROJECT,
-                "run",
-                "-d",
-                "--name",
-                name,
-                "agent",
-            ],
-            env_extra={"AGENT_NAME": name},
-        )
+        existing = subprocess.run(
+            ["docker", "ps", "-a", "-q", "--filter", f"name=^/{name}$"],
+            capture_output=True, text=True
+        ).stdout.strip()
+
+        if existing:
+            print(f"Resuming: {name}")
+            code = run_cmd(["docker", "start", name])
+        else:
+            print(f"Starting: {name}")
+            code = run_cmd(
+                ["docker", "compose", "-f", COMPOSE_FILE, "-p", COMPOSE_PROJECT,
+                 "run", "-d", "--name", name, "agent"],
+                env_extra={"AGENT_NAME": name}
+            )
+
         if code != 0:
             print(f"Failed to start {name}", file=sys.stderr)
             sys.exit(code)

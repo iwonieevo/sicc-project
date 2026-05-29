@@ -4,11 +4,10 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
-from app.database import get_db
+from app.database import SessionLocal
 from app.models import Device
 from app.routers import agent, commands, devices, execute
-from fastapi import Depends, FastAPI
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -17,11 +16,13 @@ logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 LOGGER = logging.getLogger(__name__)
 
 
-def _sync_monitor_db_worker(interval: int, db: Session = Depends(get_db)):
+def _sync_monitor_db_worker(interval: int):
     """
     Pure synchronous database operations worker.
     Runs isolated inside an OS threadpool thread via `asyncio.to_thread()`.
     """
+    db = SessionLocal()
+    
     try:
         threshold = datetime.now(timezone.utc) - timedelta(seconds=interval)
 
@@ -41,6 +42,9 @@ def _sync_monitor_db_worker(interval: int, db: Session = Depends(get_db)):
     except Exception as e:
         LOGGER.error(f"Error in device status monitor DB operations: {e}")
         db.rollback()
+    
+    finally:
+        db.close()
 
 
 async def monitor_device_status_loop(interval: int):
