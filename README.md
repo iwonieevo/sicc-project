@@ -18,6 +18,7 @@ Copy and fill in the example environment files before starting anything:
 cp .env.example .env
 cp env/.env.agent.example env/.env.agent
 cp env/.env.backend.example env/.env.backend
+cp env/.env.server-iot.example env/.env.server-iot
 ```
 
 OpenSSL must be available on your PATH. On Linux/macOS:
@@ -42,19 +43,20 @@ This creates a local CA and a PostgreSQL server certificate under `db/certs/`. T
 
 ### `.env` (root)
 
-| Variable                  | Default          | Description                                        |
-| ------------------------- | ---------------- | -------------------------------------------------- |
-| `FRONTEND_EXPOSED_PORT`   | `3000`           | Host port exposed for the frontend                 |
-| `BACKEND_EXPOSED_PORT`    | `8000`           | Host port exposed for the backend                  |
-| `IOT_SERVER_EXPOSED_PORT` | `7000`           | Host port exposed for the IoT server               |
-| `POSTGRES_EXPOSED_PORT`   | `5432`           | Host port exposed for PostgreSQL                   |
-| `AGENT_NET_NAME`          | `sicc-agent-net` | Docker network shared between infra and agents     |
-| `POSTGRES_DB`             | `sicc`           | Database name                                      |
-| `POSTGRES_USER`           | `admin`          | Postgres superuser name                            |
-| `POSTGRES_PASSWORD`       |                  | Postgres superuser password (required)             |
-| `DB_BACKEND_PASSWORD`     |                  | DB password for the backend service (required)     |
-| `DB_IOT_PASSWORD`         |                  | DB password for the IoT server (required)          |
-| `ENV`                     | `development`    | Runtime environment (`development` / `production`) |
+| Variable                  | Default           |Description                                         |
+| ------------------------- | ----------------- | -------------------------------------------------- |
+| `FRONTEND_EXPOSED_PORT`   | `3000`            | Host port exposed for thefrontend                  |
+| `BACKEND_EXPOSED_PORT`    | `8000`            | Host port exposed for thebackend                   |
+| `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port exposed for the IoTserver                |
+| `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port exposed for PostgreSQL                   |
+| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents     |
+| `AGENT_LABEL`             | `sicc.role=agent` | Label identifying agent docker processes           |
+| `POSTGRES_DB`             | `sicc`            | Database name                                      |
+| `POSTGRES_USER`           | `admin`           | Postgres superuser name                            |
+| `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password (required)             |
+| `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service (required)     |
+| `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server (required)          |
+| `ENV`                     | `development`     | Runtime environment (`development` / `production`) |
 
 ### `env/.env.agent`
 
@@ -65,11 +67,17 @@ This creates a local CA and a PostgreSQL server certificate under `db/certs/`. T
 
 ### `env/.env.backend`
 
-| Variable                          | Default | Description                                     |
-| --------------------------------- | ------- | ----------------------------------------------- |
-| `JWT_SECRET_KEY`                  |         | Secret used to sign JWTs (change in production) |
-| `JWT_ALGORITHM`                   | `HS256` | JWT signing algorithm                           |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`    | Token lifetime in minutes                       |
+| Variable                          | Default    | Description                                     |
+| --------------------------------- | ---------- | ----------------------------------------------- |
+| `JWT_SECRET_KEY`                  | `changeme` | Secret used to sign JWTs (change in production) |
+| `JWT_ALGORITHM`                   | `HS256`    | JWT signing algorithm                           |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`       | Token lifetime in minutes                       |
+
+### `env/.env.server-iot`
+
+| Variable                          | Default | Description                                                                  |
+| --------------------------------- | ------- | ---------------------------------------------------------------------------- |
+| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`    | Seconds between background health checks to mark inactive agents as offline  |
 
 ---
 
@@ -169,18 +177,28 @@ docker-compose -f docker-compose.infra.yml up -d --build
 
 ## Logs
 
-```bash
-# All infrastructure services
-docker-compose -f docker-compose.infra.yml logs -f
+### All infrastructure services
 
-# Specific infrastructure service
+```bash
+docker-compose -f docker-compose.infra.yml logs -f
+```
+
+### Specific infrastructure service
+
+```bash
 docker-compose -f docker-compose.infra.yml logs -f iot-server
 docker-compose -f docker-compose.infra.yml logs -f backend
+```
 
-# All agents
+### All agents
+
+```bash
 docker-compose -f docker-compose.agents.yml --profile all logs -f
+```
 
-# Specific agent
+### Specific agent
+
+```bash
 docker logs -f agent-alpha
 ```
 
@@ -241,8 +259,8 @@ agent_name = os.getenv("AGENT_NAME", socket.gethostname())
 
 Once running, services are available on the ports configured in `.env`:
 
-- Frontend (`FRONTEND_EXPOSED_PORT`) - default http://localhost:3000
-- Backend API (`BACKEND_EXPOSED_PORT`) - default http://localhost:8000
-- IoT Server (`IOT_SERVER_EXPOSED_PORT`) - default http://localhost:7000
+- Frontend (`FRONTEND_EXPOSED_PORT`) - default `http://localhost:3000`
+- Backend API (`BACKEND_EXPOSED_PORT`) - default `http://localhost:8000`
+- IoT Server (`IOT_SERVER_EXPOSED_PORT`) - default `http://localhost:7000`
 
 Create an account via the sign-up page, then log in to issue commands.

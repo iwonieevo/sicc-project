@@ -1,13 +1,14 @@
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
-import bcrypt
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
 import os
 import string
+from datetime import datetime, timedelta, timezone
 
-from app.database import SessionLocal
+import bcrypt
+from app.database import get_db
 from app.models import User
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_change_me_in_production")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
@@ -23,41 +24,25 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
+
 def validate_password(password: str):
     if len(password) < 8:
-        raise HTTPException(
-            status_code=400,
-            detail="Password must have at least 8 characters"
-        )
+        raise HTTPException(status_code=400, detail="Password must have at least 8 characters")
 
     if len(password) > 72:
-        raise HTTPException(
-            status_code=400,
-            detail="Password must have at most 72 characters"
-        )
+        raise HTTPException(status_code=400, detail="Password must have at most 72 characters")
 
     if password != password.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Password cannot start or end with spaces"
-        )
+        raise HTTPException(status_code=400, detail="Password cannot start or end with spaces")
 
     if not any(char.isdigit() for char in password):
-        raise HTTPException(
-            status_code=400,
-            detail="Password must contain at least one number"
-        )
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
 
     if not any(char.isupper() for char in password):
-        raise HTTPException(
-            status_code=400,
-            detail="Password must contain at least one uppercase letter"
-        )
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
     if not any(char in string.punctuation for char in password):
-            raise HTTPException(
-                status_code=400,
-                detail="Password must contain at least one special character"
-            )
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -67,71 +52,43 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user(
+    token: str = Depends(oauth2_scheme), 
+    optional: bool = False, 
+    db: Session = Depends(get_db)
+):
     """Get current user from JWT token."""
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
+        if optional: return None
+        raise credentials_exception
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
-        
+
         if email is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(
-            User.email == email,
-            User.is_deleted == False
-        ).first()
+            if optional: return None
+            raise credentials_exception
         
+    except JWTError:
+        if optional: return None
+        raise credentials_exception
+    
+        user = (
+            db.query(User)
+            .filter(User.email == email, User.is_deleted == False)
+            .first()
+        )
+
         if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
+            if optional: return None
+            raise credentials_exception
+
         return {"email": user.email}
-    finally:
-        db.close()
-
-
-def get_current_user_optional(token: str = Depends(oauth2_scheme)):
-    """Get current user from JWT token, returns None if not authenticated."""
-    if not token:
-        return None
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-        
-        if email is None:
-            return None
-            
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(
-                User.email == email,
-                User.is_deleted == False
-            ).first()
-            return {"email": user.email} if user else None
-        finally:
-            db.close()
-    except JWTError:
-        return None

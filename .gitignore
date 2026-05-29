@@ -84,5 +84,6 @@ logs/
 *~
 .DS_Store
 
-# Project files
+# Black and Ruff
 pyproject.toml
+.ruff_cache
