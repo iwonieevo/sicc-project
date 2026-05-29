@@ -1,6 +1,6 @@
-from sqlalchemy import Column, BigInteger, Text, DateTime, Boolean, ForeignKey, JSON
+from app.database import Base
+from sqlalchemy import JSON, BigInteger, Boolean, Column, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
-from .database import Base
 
 
 class Device(Base):
@@ -53,7 +53,7 @@ class CommandExecution(Base):
     queue_id = Column(BigInteger, ForeignKey("command_queue.id"), primary_key=True)
     started_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
     is_cancelled = Column(Boolean, nullable=False, default=False)
-    
+
 
 class CommandResult(Base):
     __tablename__ = "command_results"
@@ -62,9 +62,10 @@ class CommandResult(Base):
     result = Column(Text, nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
 
+
 class VCommandLog(Base):
     __tablename__ = "v_command_log"
-    __table_args__ = {'info': {'is_view': True}}
+    __table_args__ = {"info": {"is_view": True}}
     queue_id = Column(BigInteger, primary_key=True)
     device_id = Column(BigInteger)
     device_name = Column(Text)

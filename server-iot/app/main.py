@@ -1,81 +1,102 @@
-from fastapi import FastAPI
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
-from app.routers import devices, commands, agent, execute, queue
 from app.database import SessionLocal
 from app.models import Device
+from app.routers import agent, commands, devices, execute
+from fastapi import FastAPI
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 
 LOGGER = logging.getLogger(__name__)
 
 
-async def monitor_device_status():
+def _sync_monitor_db_worker(interval: int):
     """
-    Background task that checks device statuses every 30 seconds.
+    Pure synchronous database operations worker.
+    Runs isolated inside an OS threadpool thread via `asyncio.to_thread()`.
+    """
+    db = SessionLocal()
     
-    Devices that are not 'busy' and haven't been seen for over 30 seconds
-    are marked as 'offline'.
+    try:
+        threshold = datetime.now(timezone.utc) - timedelta(seconds=interval)
+
+        devices_to_update = (
+            db.query(Device)
+            .filter(Device.is_deleted == False, Device.status != "offline", Device.last_seen < threshold)
+            .all()
+        )
+
+        if devices_to_update:
+            LOGGER.info(f"Found {len(devices_to_update)} stale device(s)")
+            for device in devices_to_update:
+                LOGGER.info(f"Marking device '{device.name}' (ID={device.id}) as offline")
+                device.status = "offline"
+            db.commit()
+
+    except Exception as e:
+        LOGGER.error(f"Error in device status monitor DB operations: {e}")
+        db.rollback()
+    
+    finally:
+        db.close()
+
+
+async def monitor_device_status_loop(interval: int):
     """
+    Non-blocking async wrapper loop. Coordinates timing using `asyncio.sleep`
+    and safely hands heavy database network I/O over to external thread workers.
+    """
+    if interval < 1:
+        LOGGER.error(f"Invalid monitor interval '{interval}' seconds. Background loop aborted.")
+        return
+
+    LOGGER.info(f"Device health tracking initiated. Scan frequency: every {interval} seconds.")
+
     while True:
         try:
-            await asyncio.sleep(30)
-            
-            db = SessionLocal()
-            try:
-                threshold = datetime.now(timezone.utc) - timedelta(seconds=20)
-                
-                devices_to_update = db.query(Device).filter(
-                    Device.is_deleted == False,
-                    Device.status != 'busy',
-                    Device.last_seen < threshold
-                ).all()
-                
-                if devices_to_update:
-                    LOGGER.info(f"Found {len(devices_to_update)} stale device(s)")
-                    for device in devices_to_update:
-                        LOGGER.info(f"Marking device '{device.name}' (ID={device.id}) as offline")
-                        device.status = 'offline'
-                    db.commit()
-                
-            except Exception as e:
-                LOGGER.error(f"Error in device status monitor: {e}")
-                db.rollback()
-            finally:
-                db.close()
-                
+            await asyncio.sleep(interval)
+            await asyncio.to_thread(_sync_monitor_db_worker, interval)
+        except asyncio.CancelledError:
+            LOGGER.info(
+                "Device monitor execution loop caught cancel request. Halting thread worker assignments."
+            )
+            break
         except Exception as e:
-            LOGGER.error(f"Unexpected error in monitor loop: {e}")
+            LOGGER.error(f"Unexpected error in monitor engine layer: {e}")
             await asyncio.sleep(5)
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handles continuous orchestration steps matching server execution context lifetimes."""
+    LOGGER.info("Starting IoT server engine - launching device status monitor task")
+
+    monitor_interval = int(os.getenv("DEVICE_MONITOR_INTERVAL_SECONDS", "15"))
+    monitor_task = asyncio.create_task(monitor_device_status_loop(monitor_interval))
+
+    yield
+
+    LOGGER.info("Shutting down IoT server - request cancellation of ongoing worker tasks")
+    monitor_task.cancel()
+    try:
+        await monitor_task
+    except asyncio.CancelledError:
+        pass
+    LOGGER.info("Server shutdown operations completed successfully.")
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(devices.router)
 app.include_router(commands.router)
 app.include_router(agent.router)
 app.include_router(execute.router)
-app.include_router(queue.router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Start background monitoring task when server starts."""
-    LOGGER.info("Starting IoT server - launching device status monitor")
-    asyncio.create_task(monitor_device_status())
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean shutdown."""
-    LOGGER.info("Shutting down IoT server")
 
 
 @app.get("/")

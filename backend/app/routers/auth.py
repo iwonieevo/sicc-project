@@ -1,58 +1,46 @@
-from fastapi import APIRouter, HTTPException, Depends
-from app.schemas import UserRegister, UserLogin, TokenResponse
 from app.auth import (
-    hash_password,
-    verify_password,
     create_access_token,
     get_current_user,
-    validate_password
+    hash_password,
+    validate_password,
+    verify_password,
 )
-from app.database import SessionLocal
+from app.database import get_db
 from app.models import User
+from app.schemas import TokenResponse, UserLogin, UserRegister
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
 @router.post("/signup")
-def register(user: UserRegister):
+def register(user: UserRegister, db: Session = Depends(get_db)):
     validate_password(user.password)
-    db = SessionLocal()
-    try:
-        existing = db.query(User).filter(User.email == user.email).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Email already registered")
 
-        hashed_password = hash_password(user.password)
-        new_user = User(email=user.email, hashed_password=hashed_password)
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-        return {"status": "User registered successfully"}
-    finally:
-        db.close()
+    hashed_password = hash_password(user.password)
+    new_user = User(email=user.email, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"status": "User registered successfully"}
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(user: UserLogin):
-    db = SessionLocal()
-    try:
-        existing_user = db.query(User).filter(User.email == user.email).first()
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user.email).first()
 
-        if not existing_user:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not existing_user or not verify_password(user.password, existing_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        if not verify_password(user.password, existing_user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+    access_token = create_access_token(data={"sub": existing_user.email})
 
-        access_token = create_access_token(data={"sub": existing_user.email})
-
-        return {
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-    finally:
-        db.close()
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me")

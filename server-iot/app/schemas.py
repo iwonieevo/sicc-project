@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class RegisterRequest(BaseModel):
@@ -91,10 +92,10 @@ class QueueItemResponse(BaseModel):
     parameters: Optional[Dict[str, Any]]
     status: str
     queued_at: str
-    can_cancel: bool 
+    can_cancel: bool
 
 
 class QueueCancelResponse(BaseModel):
     status: str
     device_id: int
-    queue_id: int 
+    queue_id: int
