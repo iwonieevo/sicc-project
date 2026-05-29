@@ -10,11 +10,7 @@ router = APIRouter()
 @router.get("/commands", response_model=list[CommandResponse])
 def get_commands(db: Session = Depends(get_db)):
     """Get all available commands with their parameters for backend."""
-    commands = (
-        db.query(Command)
-        .filter(Command.is_deleted == False)
-        .all()
-    )
+    commands = db.query(Command).filter(Command.is_deleted == False).all()
     result = []
 
     for cmd in commands:
@@ -52,11 +48,7 @@ def get_commands(db: Session = Depends(get_db)):
 def create_command(request: CommandCreateRequest, db: Session = Depends(get_db)):
     """Create a new command definition."""
     try:
-        existing = (
-            db.query(Command)
-            .filter(Command.name == request.name)
-            .first()
-        )
+        existing = db.query(Command).filter(Command.name == request.name).first()
         if existing:
             raise HTTPException(status_code=400, detail="Command with this name already exists")
 

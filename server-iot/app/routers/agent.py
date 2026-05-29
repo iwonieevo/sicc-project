@@ -22,11 +22,7 @@ LOGGER = logging.getLogger(__name__)
 @router.post("/agent/register", response_model=RegisterResponse)
 def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
     """Registers a new agent or restores online status for an existing one. Returns device_id and registration status."""
-    device = (
-        db.query(Device)
-        .filter(Device.name == data.name)
-        .first()
-    )
+    device = db.query(Device).filter(Device.name == data.name).first()
 
     if device:
         if device.is_deleted:
@@ -48,16 +44,11 @@ def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
     return RegisterResponse(device_id=device.id, status="registered")
 
 
-
 @router.get("/agent/{device_id}/commands", response_model=PollCommandResponse)
 def poll_commands(device_id: int, db: Session = Depends(get_db)):
     """Checks device status and returns the next pending task from the execution queue, if available."""
     try:
-        device = (
-            db.query(Device)
-            .filter(Device.id == device_id, Device.is_deleted == False)
-            .first()
-        )
+        device = db.query(Device).filter(Device.id == device_id, Device.is_deleted == False).first()
 
         if not device:
             raise HTTPException(status_code=404, detail="Device not found")
@@ -74,7 +65,8 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
                 func.coalesce(CommandExecution.is_cancelled, False) == False,
                 CommandResult.queue_id == None,
             )
-            .order_by(CommandQueue.queued_at).first()
+            .order_by(CommandQueue.queued_at)
+            .first()
         ) or (None, None)
 
         if not queue:
@@ -82,9 +74,7 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
             return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
 
         command = (
-            db.query(Command)
-            .filter(Command.id == queue.command_id, Command.is_deleted == False)
-            .first()
+            db.query(Command).filter(Command.id == queue.command_id, Command.is_deleted == False).first()
         )
 
         if not command:
@@ -99,7 +89,7 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
             .filter(CommandParameter.command_id == command.id, CommandParameter.is_deleted == False)
             .all()
         )
-        
+
         params = ", ".join([p.name for p in params])
         function_def = f"def _sicc_command({params}):\n"
         indented_code = "\n".join(f"\t{line}" for line in command.python_code.splitlines())
@@ -130,19 +120,11 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
 def receive_callback(data: CallbackRequest, db: Session = Depends(get_db)):
     """Records the execution result reported by an agent and restores its online status."""
     try:
-        queue = (
-            db.query(CommandQueue)
-            .filter(CommandQueue.id == data.queue_id)
-            .first()
-        )
+        queue = db.query(CommandQueue).filter(CommandQueue.id == data.queue_id).first()
         if not queue:
             raise HTTPException(status_code=404, detail="Queue entry not found")
 
-        device = (
-            db.query(Device)
-            .filter(Device.id == queue.device_id)
-            .first()
-        )
+        device = db.query(Device).filter(Device.id == queue.device_id).first()
         if not device:
             LOGGER.warning(
                 f"Device not found when processing callback for Queue ID {data.queue_id} (Device ID: {queue.device_id})"

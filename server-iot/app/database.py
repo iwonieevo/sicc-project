@@ -34,9 +34,12 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 class Base(DeclarativeBase):
     """Modern declarative base class for all database models."""
+
     pass
+
 
 def get_db() -> Generator[Session, None, None]:
     """Yields a database session scoped to a single request, ensuring clean teardown."""

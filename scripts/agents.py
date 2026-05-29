@@ -26,7 +26,7 @@ def get_agent_label() -> str:
     return label.removeprefix("label=")
 
 
-def run_cmd(cmd: list[str], env_extra: dict|None = None) -> int:
+def run_cmd(cmd: list[str], env_extra: dict | None = None) -> int:
     env = os.environ.copy()
     if env_extra:
         env.update(env_extra)
@@ -34,8 +34,7 @@ def run_cmd(cmd: list[str], env_extra: dict|None = None) -> int:
 
 
 def get_agent_names(running_only=False) -> list[str]:
-    cmd = ["docker", "ps", "--filter", f"label={get_agent_label()}",
-           "--format", "{{.Names}}"]
+    cmd = ["docker", "ps", "--filter", f"label={get_agent_label()}", "--format", "{{.Names}}"]
     if not running_only:
         cmd.insert(2, "-a")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -44,13 +43,25 @@ def get_agent_names(running_only=False) -> list[str]:
 
 # commands
 
+
 def cmd_start(args):
     for name in args.names:
         print(f"Starting: {name}")
         code = run_cmd(
-            ["docker", "compose", "-f", COMPOSE_FILE, "-p", COMPOSE_PROJECT,
-             "run", "-d", "--name", name, "agent"],
-            env_extra={"AGENT_NAME": name}
+            [
+                "docker",
+                "compose",
+                "-f",
+                COMPOSE_FILE,
+                "-p",
+                COMPOSE_PROJECT,
+                "run",
+                "-d",
+                "--name",
+                name,
+                "agent",
+            ],
+            env_extra={"AGENT_NAME": name},
         )
         if code != 0:
             print(f"Failed to start {name}", file=sys.stderr)
@@ -98,18 +109,28 @@ def cmd_logs(args):
 def cmd_list(args):
     label = get_agent_label()
     print("Running agents:")
-    run_cmd(["docker", "ps",
-             "--filter", f"label={label}",
-             "--format", "table {{.Names}}\t{{.Status}}\t{{.ID}}"])
+    run_cmd(
+        ["docker", "ps", "--filter", f"label={label}", "--format", "table {{.Names}}\t{{.Status}}\t{{.ID}}"]
+    )
 
     print("\nStopped agents:")
-    run_cmd(["docker", "ps", "-a",
-             "--filter", f"label={label}",
-             "--filter", "status=exited",
-             "--format", "table {{.Names}}\t{{.Status}}\t{{.ID}}"])
+    run_cmd(
+        [
+            "docker",
+            "ps",
+            "-a",
+            "--filter",
+            f"label={label}",
+            "--filter",
+            "status=exited",
+            "--format",
+            "table {{.Names}}\t{{.Status}}\t{{.ID}}",
+        ]
+    )
 
 
 # CLI
+
 
 def main():
     parser = argparse.ArgumentParser(prog="agents", description="Manage SICC agents")

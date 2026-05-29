@@ -10,11 +10,7 @@ router = APIRouter()
 @router.get("/devices", response_model=list[DeviceResponse])
 def get_devices(db: Session = Depends(get_db)):
     """Get all registered devices for backend."""
-    devices = (
-        db.query(Device)
-        .filter(Device.is_deleted == False)
-        .all()
-    )
+    devices = db.query(Device).filter(Device.is_deleted == False).all()
 
     return [
         DeviceResponse(
@@ -33,12 +29,8 @@ def get_device_queue(device_id: int, limit: int = 50, db: Session = Depends(get_
 
     if limit < 0:
         raise HTTPException(status_code=400, detail="Limit must be a non-negative integer.")
-    
-    device = (
-        db.query(Device)
-        .filter(Device.id == device_id, Device.is_deleted == False)
-        .first()
-    )
+
+    device = db.query(Device).filter(Device.id == device_id, Device.is_deleted == False).first()
 
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -81,9 +73,7 @@ def cancel_queue_task(device_id: int, queue_id: int, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Queue task not found")
 
     if queue_log.status != "queued":
-        raise HTTPException(
-            status_code=409, detail="Cannot cancel task that is already running or finished"
-        )
+        raise HTTPException(status_code=409, detail="Cannot cancel task that is already running or finished")
 
     command_execution = CommandExecution(queue_id=queue_id, is_cancelled=True)
     db.add(command_execution)

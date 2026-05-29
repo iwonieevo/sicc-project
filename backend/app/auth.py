@@ -53,9 +53,7 @@ def create_access_token(data: dict):
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme), 
-    optional: bool = False, 
-    db: Session = Depends(get_db)
+    token: str = Depends(oauth2_scheme), optional: bool = False, db: Session = Depends(get_db)
 ):
     """Get current user from JWT token."""
 
@@ -66,7 +64,8 @@ def get_current_user(
     )
 
     if not token:
-        if optional: return None
+        if optional:
+            return None
         raise credentials_exception
 
     try:
@@ -74,21 +73,20 @@ def get_current_user(
         email = payload.get("sub")
 
         if email is None:
-            if optional: return None
+            if optional:
+                return None
             raise credentials_exception
-        
+
     except JWTError:
-        if optional: return None
+        if optional:
+            return None
         raise credentials_exception
-    
-        user = (
-            db.query(User)
-            .filter(User.email == email, User.is_deleted == False)
-            .first()
-        )
+
+        user = db.query(User).filter(User.email == email, User.is_deleted == False).first()
 
         if user is None:
-            if optional: return None
+            if optional:
+                return None
             raise credentials_exception
 
         return {"email": user.email}

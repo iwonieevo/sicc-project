@@ -18,11 +18,7 @@ router = APIRouter(prefix="/api", tags=["auth"])
 def register(user: UserRegister, db: Session = Depends(get_db)):
     validate_password(user.password)
 
-    existing_user = (
-        db.query(User)
-        .filter(User.email == user.email)
-        .first()
-    )
+    existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -37,11 +33,7 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    existing_user = (
-        db.query(User)
-        .filter(User.email == user.email)
-        .first()
-    )
+    existing_user = db.query(User).filter(User.email == user.email).first()
 
     if not existing_user or not verify_password(user.password, existing_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
