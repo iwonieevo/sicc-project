@@ -83,3 +83,7 @@ logs/
 *.bak
 *~
 .DS_Store
+
+# Black and Ruff
+pyproject.toml
+.ruff_cache

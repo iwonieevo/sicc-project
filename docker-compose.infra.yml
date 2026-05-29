@@ -59,6 +59,7 @@ services:
           create_host_path: false
     env_file:
       - .env
+      - env/.env.server-iot
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432

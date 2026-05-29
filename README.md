@@ -6,6 +6,7 @@ Distributed system for remote command execution on IoT agents via a web interfac
 
 - Docker
 - Docker Compose v2
+- Python 3.11+ (for agent management script)
 - OpenSSL (for generating database TLS certificates)
 
 ---
@@ -18,7 +19,50 @@ Copy and fill in the example environment files before starting anything:
 cp .env.example .env
 cp env/.env.agent.example env/.env.agent
 cp env/.env.backend.example env/.env.backend
+cp env/.env.server-iot.example env/.env.server-iot
 ```
+
+### `.env`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `FRONTEND_EXPOSED_PORT` | `3000` | Host port for the frontend |
+| `BACKEND_EXPOSED_PORT` | `8000` | Host port for the backend |
+| `IOT_SERVER_EXPOSED_PORT` | `7000` | Host port for the IoT server |
+| `POSTGRES_EXPOSED_PORT` | `5432` | Host port for PostgreSQL |
+| `AGENT_NET_NAME` | `sicc-agent-net` | Docker network shared between infra and agents |
+| `AGENT_LABEL` | `sicc.role=agent` | Label applied to agent containers |
+| `POSTGRES_DB` | `sicc` | Database name |
+| `POSTGRES_USER` | `admin` | Postgres superuser name |
+| `POSTGRES_PASSWORD` | `changeme` | Postgres superuser password |
+| `DB_BACKEND_PASSWORD` | `changeme` | DB password for the backend service |
+| `DB_IOT_PASSWORD` | `changeme` | DB password for the IoT server |
+| `ENV` | `development` | Runtime environment (`development` / `production`) |
+
+### `env/.env.agent`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `POLL_INTERVAL` | `2` | Seconds between command polls to the IoT server |
+| `REGISTRATION_ATTEMPTS` | `10` | Number of registration retries on startup |
+
+### `env/.env.backend`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `JWT_SECRET_KEY` | `changeme` | Secret used to sign JWTs |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token lifetime in minutes |
+
+### `env/.env.server-iot`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15` | Seconds between health checks to mark inactive agents offline |
+
+---
+
+## TLS Certificates
 
 OpenSSL must be available on your PATH. On Linux/macOS:
 
@@ -26,195 +70,135 @@ OpenSSL must be available on your PATH. On Linux/macOS:
 sh scripts/generate-db-certs.sh
 ```
 
-On Windows, the recommended approach is Git Bash (which bundles OpenSSL):
+On Windows with Git Bash (recommended, bundles OpenSSL):
 
 ```bash
 MSYS_NO_PATHCONV=1 sh scripts/generate-db-certs.sh
 ```
 
-Alternatively, if OpenSSL is on your PATH, the PowerShell script works too:
+Or with PowerShell if OpenSSL is on your PATH:
 
 ```powershell
 .\scripts\generate-db-certs.ps1
 ```
 
-This creates a local CA and a PostgreSQL server certificate under `db/certs/`. The script will refuse to overwrite existing certificates - delete the files in `db/certs/` first if you need to regenerate them.
-
-### `.env` (root)
-
-| Variable                  | Default          | Description                                        |
-| ------------------------- | ---------------- | -------------------------------------------------- |
-| `FRONTEND_EXPOSED_PORT`   | `3000`           | Host port exposed for the frontend                 |
-| `BACKEND_EXPOSED_PORT`    | `8000`           | Host port exposed for the backend                  |
-| `IOT_SERVER_EXPOSED_PORT` | `7000`           | Host port exposed for the IoT server               |
-| `POSTGRES_EXPOSED_PORT`   | `5432`           | Host port exposed for PostgreSQL                   |
-| `AGENT_NET_NAME`          | `sicc-agent-net` | Docker network shared between infra and agents     |
-| `POSTGRES_DB`             | `sicc`           | Database name                                      |
-| `POSTGRES_USER`           | `admin`          | Postgres superuser name                            |
-| `POSTGRES_PASSWORD`       |                  | Postgres superuser password (required)             |
-| `DB_BACKEND_PASSWORD`     |                  | DB password for the backend service (required)     |
-| `DB_IOT_PASSWORD`         |                  | DB password for the IoT server (required)          |
-| `ENV`                     | `development`    | Runtime environment (`development` / `production`) |
-
-### `env/.env.agent`
-
-| Variable                | Default | Description                                     |
-| ----------------------- | ------- | ----------------------------------------------- |
-| `POLL_INTERVAL`         | `2`     | Seconds between command polls to the IoT server |
-| `REGISTRATION_ATTEMPTS` | `10`    | Number of registration retries on startup       |
-
-### `env/.env.backend`
-
-| Variable                          | Default | Description                                     |
-| --------------------------------- | ------- | ----------------------------------------------- |
-| `JWT_SECRET_KEY`                  |         | Secret used to sign JWTs (change in production) |
-| `JWT_ALGORITHM`                   | `HS256` | JWT signing algorithm                           |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`    | Token lifetime in minutes                       |
+This creates a local CA and a PostgreSQL server certificate under `db/certs/`. The script refuses to overwrite existing certificates - delete the files in `db/certs/` first if you need to regenerate them.
 
 ---
 
 ## Running the Project
 
-### Start everything at once
+### Infrastructure
+
+Infrastructure must be running before any agents are started.
 
 ```bash
-docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all up -d --build
+docker compose -f docker-compose.infra.yml up -d --build
 ```
 
-### Start infrastructure only
+Services started: `frontend`, `backend`, `iot-server`, `db`.
+
+### Agents
+
+Agents are managed via the `agents.py` script:
 
 ```bash
-docker-compose -f docker-compose.infra.yml up -d --build
+python scripts/agents.py start agent-alpha
+python scripts/agents.py start agent-alpha agent-beta agent-gamma
 ```
 
-### Start agents only (infrastructure must already be running)
+The agent name is arbitrary — any string matching `[a-zA-Z0-9][a-zA-Z0-9_.-]+` is valid.
 
-All agents:
-
-```bash
-docker-compose -f docker-compose.agents.yml --profile all up -d
-```
-
-Specific agents:
-
-```bash
-docker-compose -f docker-compose.agents.yml --profile alpha --profile beta up -d
-```
+On first run, the agent container is created. On subsequent runs of the same name, the existing stopped container is resumed.
 
 ---
 
-## Stopping the Project
+## Stopping and Resetting
 
-### Stop everything
+### Stop agents
+
+Stop a specific agent (container is kept, can be resumed):
 
 ```bash
-docker-compose -f docker-compose.infra.yml -f docker-compose.agents.yml --profile all down
+python scripts/agents.py stop agent-alpha
+python scripts/agents.py stop agent-alpha agent-beta
+python scripts/agents.py stop --all
 ```
 
-### Stop infrastructure only
+### Remove agents
+
+Stop and remove agent containers:
 
 ```bash
-docker-compose -f docker-compose.infra.yml down
+python scripts/agents.py down agent-alpha
+python scripts/agents.py down --all
 ```
 
-### Stop all agents (leave infrastructure running)
+### Stop infrastructure
 
 ```bash
-docker-compose -f docker-compose.agents.yml --profile all down
+docker compose -f docker-compose.infra.yml stop
 ```
 
-### Stop a specific agent
+This preserves database data and container state. Subsequent starts are instant.
+
+### Tear down infrastructure
+
+Removes containers and networks, but keeps database volumes:
 
 ```bash
-docker-compose -f docker-compose.agents.yml --profile alpha down
-# or directly:
-docker stop agent-alpha && docker rm agent-alpha
+docker compose -f docker-compose.infra.yml down
 ```
 
----
+### Full reset (destroys database)
 
-## Resetting the Database
-
-Bring everything down and remove the volume:
+Permanently deletes all data including the PostgreSQL volume:
 
 ```bash
-docker-compose -f docker-compose.infra.yml down -v
-```
-
-Then start again:
-
-```bash
-docker-compose -f docker-compose.infra.yml up -d --build
+docker compose -f docker-compose.infra.yml down -v
 ```
 
 ---
 
 ## Logs
 
+### Infrastructure logs
+
+All services:
+
 ```bash
-# All infrastructure services
-docker-compose -f docker-compose.infra.yml logs -f
+docker compose -f docker-compose.infra.yml logs -f
+```
 
-# Specific infrastructure service
-docker-compose -f docker-compose.infra.yml logs -f iot-server
-docker-compose -f docker-compose.infra.yml logs -f backend
+Specific service:
 
-# All agents
-docker-compose -f docker-compose.agents.yml --profile all logs -f
+```bash
+docker compose -f docker-compose.infra.yml logs -f iot-server
+docker compose -f docker-compose.infra.yml logs -f backend
+```
 
-# Specific agent
-docker logs -f agent-alpha
+### Agents logs
+
+Specific agent:
+
+```bash
+python scripts/agents.py logs agent-alpha
+python scripts/agents.py logs agent-alpha -f
 ```
 
 ---
 
-## Managing Agents
+## Agent Management Reference
 
-### Predefined agents
-
-The following named agents are defined in `docker-compose.agents.yml`, each with its own Docker Compose profile:
-
-| Agent           | Profile   |
-| --------------- | --------- |
-| `agent-alpha`   | `alpha`   |
-| `agent-beta`    | `beta`    |
-| `agent-gamma`   | `gamma`   |
-| `agent-delta`   | `delta`   |
-| `agent-epsilon` | `epsilon` |
-
-Use `--profile all` to start all of them at once.
-
-### Adding a named agent
-
-Add a new service to `docker-compose.agents.yml`:
-
-```yaml
-agent-zeta:
-  <<: *agent-base
-  container_name: agent-zeta
-  environment:
-    - AGENT_NAME=agent-zeta
-  profiles: ["zeta", "all"]
-```
-
-Then start it:
-
-```bash
-docker-compose -f docker-compose.agents.yml --profile zeta up -d
-```
-
-### Scaling agents dynamically
-
-For anonymous agents, use the base `agent` service with `--scale`. It has the `never` profile to prevent accidental standalone use:
-
-```bash
-docker-compose -f docker-compose.agents.yml --profile never up -d --scale agent=5
-```
-
-Each container falls back to its Docker hostname as the agent name since no `AGENT_NAME` is set:
-
-```python
-agent_name = os.getenv("AGENT_NAME", socket.gethostname())
+```txt
+python scripts/agents.py <command> [args]
+ 
+Commands:
+  start <name> [name ...]   Create or resume agent(s)
+  stop  <name> [name ...]   Stop agent(s), keep containers  [--all]
+  down  <name> [name ...]   Stop and remove agent(s)        [--all]
+  logs  <name>              Show logs for one agent         [-f] [--tail N]
+  list                      List running and stopped agents
 ```
 
 ---
@@ -223,8 +207,8 @@ agent_name = os.getenv("AGENT_NAME", socket.gethostname())
 
 Once running, services are available on the ports configured in `.env`:
 
-- Frontend (`FRONTEND_EXPOSED_PORT`) - default http://localhost:3000
-- Backend API (`BACKEND_EXPOSED_PORT`) - default http://localhost:8000
-- IoT Server (`IOT_SERVER_EXPOSED_PORT`) - default http://localhost:7000
+- Frontend: [http://localhost:3000](http://localhost:3000) (`FRONTEND_EXPOSED_PORT`)
+- Backend API: [http://localhost:8000](http://localhost:8000) (`BACKEND_EXPOSED_PORT`)
+- IoT Server: [http://localhost:7000](http://localhost:7000) (`IOT_SERVER_EXPOSED_PORT`)
 
 Create an account via the sign-up page, then log in to issue commands.

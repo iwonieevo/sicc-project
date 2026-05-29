@@ -1,40 +1,40 @@
-import os
-import requests
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+import os
 
+import httpx
+from app.auth import get_current_user
 from app.schemas import (
+    CommandCreateRequest,
     CommandResponse,
-    DeviceResponse,
     CommandStatusResponse,
+    DeviceResponse,
     ExecuteCommandRequest,
     ExecuteCommandResponse,
-    CommandCreateRequest,
+    QueueCancelResponse,
+    QueueItemResponse,
     ResultCallbackRequest,
     QueueItemResponse,
     QueueCancelResponse,
     ExecuteAnyCommandRequest,
 )
-from app.auth import get_current_user
-
+from fastapi import APIRouter, Depends, HTTPException
 
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
-
 LOGGER = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["commands"])
+client = httpx.Client(timeout=10.0)
 
 
 def model_to_dict(model):
-    """
-    Convert a Pydantic model to a dictionary.
-    """
+    """Convert a Pydantic model to a dictionary."""
     if hasattr(model, "model_dump"):
         return model.model_dump()
     return model.dict()
 
 
 def build_server_url(path: str) -> str:
+
     return f"{IOT_SERVER_URL.rstrip('/')}{path}"
 
 
@@ -46,12 +46,11 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
     url = build_server_url(path)
 
     try:
-        response = requests.request(
+        response = client.request(
             method=method,
             url=url,
             json=json_data,
             params=params,
-            timeout=10,
         )
 
         if response.status_code >= 400:
@@ -77,7 +76,7 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
     except HTTPException:
         raise
 
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         LOGGER.error(f"Failed to forward request to IoT server: {e}")
         raise HTTPException(
             status_code=503,
@@ -208,7 +207,6 @@ def get_command_status(
     queue_id: int,
     current_user: dict = Depends(get_current_user),
 ):
-
     return forward_to_server(
         method="GET",
         path=f"/status/{queue_id}",
@@ -220,7 +218,6 @@ def create_command(
     request: CommandCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-
     return forward_to_server(
         method="POST",
         path="/commands",
@@ -230,12 +227,12 @@ def create_command(
 
 @router.post("/result")
 def receive_result(request: ResultCallbackRequest):
-
     return forward_to_server(
         method="POST",
         path="/result",
         json_data=model_to_dict(request),
     )
+
 
 @router.get("/devices/{device_id}/queue", response_model=list[QueueItemResponse])
 def get_device_queue(
@@ -251,6 +248,7 @@ def get_device_queue(
         path=f"/devices/{device_id}/queue",
         params={"limit": limit},
     )
+
 
 @router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)
 def cancel_queue_task(
