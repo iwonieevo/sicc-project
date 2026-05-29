@@ -8,14 +8,12 @@ from app.schemas import (
     CommandResponse,
     CommandStatusResponse,
     DeviceResponse,
+    ExecuteAnyCommandRequest,
     ExecuteCommandRequest,
     ExecuteCommandResponse,
     QueueCancelResponse,
     QueueItemResponse,
     ResultCallbackRequest,
-    QueueItemResponse,
-    QueueCancelResponse,
-    ExecuteAnyCommandRequest,
 )
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -125,6 +123,7 @@ def execute_command(
         status_url=f"/api/status/{queue_id}",
     )
 
+
 @router.post("/execute/any", response_model=ExecuteCommandResponse)
 def execute_command_any_agent(
     request: ExecuteAnyCommandRequest,
@@ -135,10 +134,7 @@ def execute_command_any_agent(
     if not isinstance(devices, list):
         raise HTTPException(status_code=404, detail="No devices found")
 
-    available_devices = [
-        device for device in devices
-        if device["status"] in ("online", "busy")
-    ]
+    available_devices = [device for device in devices if device["status"] in ("online", "busy")]
 
     if not available_devices:
         raise HTTPException(status_code=404, detail="No available agents")
@@ -154,15 +150,14 @@ def execute_command_any_agent(
         if not isinstance(queue, list):
             raise HTTPException(status_code=500, detail=f"Error recovering queue for device_id{device['id']}")
 
-        active_count = sum(
-            1 for item in queue
-            if item["status"] in ("queued", "running")
-        )
+        active_count = sum(1 for item in queue if item["status"] in ("queued", "running"))
 
-        device_loads.append({
-            "device_id": device["id"],
-            "active_count": active_count,
-        })
+        device_loads.append(
+            {
+                "device_id": device["id"],
+                "active_count": active_count,
+            }
+        )
 
     selected = min(device_loads, key=lambda item: item["active_count"])
 
