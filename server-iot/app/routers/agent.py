@@ -12,6 +12,8 @@ from app.models import (
 )
 from app.schemas import CallbackRequest, PollCommandResponse, RegisterRequest, RegisterResponse
 from fastapi import APIRouter, Depends, HTTPException
+from security import public_key_id
+from security.encoding import b64decode
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -19,9 +21,31 @@ router = APIRouter()
 LOGGER = logging.getLogger(__name__)
 
 
+def validate_device_public_key(
+    public_key_id_value: str | None, public_key_value: str | None
+) -> tuple[str | None, str | None]:
+    if public_key_id_value is None and public_key_value is None:
+        return None, None
+    if public_key_id_value is None or public_key_value is None:
+        raise HTTPException(status_code=400, detail="Both public_key_id and public_key are required")
+
+    try:
+        raw_public_key = b64decode(public_key_value)
+    except Exception:
+        raise HTTPException(status_code=400, detail="public_key must be base64 encoded")
+
+    if len(raw_public_key) != 32:
+        raise HTTPException(status_code=400, detail="public_key must decode to 32 bytes")
+    if public_key_id(raw_public_key) != public_key_id_value:
+        raise HTTPException(status_code=400, detail="public_key_id does not match public_key")
+
+    return public_key_id_value, public_key_value
+
+
 @router.post("/agent/register", response_model=RegisterResponse)
 def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
     """Registers a new agent or restores online status for an existing one. Returns device_id and registration status."""
+    public_key_id_value, public_key_value = validate_device_public_key(data.public_key_id, data.public_key)
     device = db.query(Device).filter(Device.name == data.name).first()
 
     if device:
@@ -29,13 +53,29 @@ def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
             LOGGER.warning(f"Registration attempt rejected for deleted device: '{data.name}'")
             raise HTTPException(status_code=400, detail="Device has been deleted")
 
+        if public_key_id_value is not None:
+            if device.public_key_id is None and device.public_key is None:
+                device.public_key_id = public_key_id_value
+                device.public_key = public_key_value
+            elif (
+                device.public_key_id != public_key_id_value
+                or device.public_key != public_key_value
+            ):
+                LOGGER.warning(f"Registration attempt rejected for device key mismatch: '{data.name}'")
+                raise HTTPException(status_code=400, detail="Device public key mismatch")
+
         device.status = "online"
         device.last_seen = datetime.now(timezone.utc)
         db.commit()
         LOGGER.info(f"Device restored to online: '{data.name}' (ID: {device.id})")
         return RegisterResponse(device_id=device.id, status="restored")
 
-    device = Device(name=data.name, status="online")
+    device = Device(
+        name=data.name,
+        public_key_id=public_key_id_value,
+        public_key=public_key_value,
+        status="online",
+    )
     db.add(device)
     db.commit()
     db.refresh(device)

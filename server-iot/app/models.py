@@ -7,6 +7,8 @@ class Device(Base):
     __tablename__ = "devices"
     id = Column(BigInteger, primary_key=True)
     name = Column(Text, unique=True, nullable=False)
+    public_key_id = Column(Text, unique=True, nullable=True)
+    public_key = Column(Text, nullable=True)
     status = Column(Text, nullable=False, default="offline")
     last_seen = Column(DateTime(timezone=True), nullable=True)
     registered_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
