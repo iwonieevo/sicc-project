@@ -24,9 +24,23 @@ from .errors import (
 )
 from .replay import DirectionState, SessionReplayState
 from .settings import SecureTransportSettings, load_secure_transport_settings
+from .service_handshake import (
+    ROLE_BACKEND_IOT,
+    ClientHandshake,
+    HandshakeStart,
+    ServerHandshake,
+    complete_client_handshake,
+    create_handshake_start,
+    create_server_handshake,
+    new_session_id,
+    now_ms,
+    verify_client_handshake_signature,
+)
+from .session_store import SecureSession, SecureSessionStore
 
 __all__ = [
     "AlgorithmSuite",
+    "ClientHandshake",
     "CryptoError",
     "DecodeError",
     "DecryptionError",
@@ -34,20 +48,31 @@ __all__ = [
     "Direction",
     "DirectionState",
     "HandshakeTranscript",
+    "HandshakeStart",
     "KeyPair",
+    "ROLE_BACKEND_IOT",
     "ReplayError",
     "SecureEnvelope",
+    "SecureSession",
+    "SecureSessionStore",
+    "ServerHandshake",
     "SessionReplayState",
     "SecureTransportSettings",
     "SignatureVerificationError",
     "StaleMessageError",
+    "complete_client_handshake",
+    "create_handshake_start",
+    "create_server_handshake",
     "decrypt_envelope",
     "derive_session_keys",
     "encrypt_envelope",
     "generate_ed25519_keypair",
     "generate_x25519_keypair",
     "load_secure_transport_settings",
+    "new_session_id",
+    "now_ms",
     "public_key_id",
     "sign_transcript",
     "verify_transcript_signature",
+    "verify_client_handshake_signature",
 ]
