@@ -23,6 +23,7 @@ from .errors import (
     StaleMessageError,
 )
 from .replay import DirectionState, SessionReplayState
+from .settings import SecureTransportSettings, load_secure_transport_settings
 
 __all__ = [
     "AlgorithmSuite",
@@ -37,6 +38,7 @@ __all__ = [
     "ReplayError",
     "SecureEnvelope",
     "SessionReplayState",
+    "SecureTransportSettings",
     "SignatureVerificationError",
     "StaleMessageError",
     "decrypt_envelope",
@@ -44,6 +46,7 @@ __all__ = [
     "encrypt_envelope",
     "generate_ed25519_keypair",
     "generate_x25519_keypair",
+    "load_secure_transport_settings",
     "public_key_id",
     "sign_transcript",
     "verify_transcript_signature",
