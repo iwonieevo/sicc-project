@@ -246,7 +246,10 @@ def create_command(
 
 
 @router.post("/result")
-def receive_result(request: ResultCallbackRequest):
+def receive_result(
+    request: ResultCallbackRequest,
+    current_user: dict = Depends(get_current_user),
+):
     return forward_to_server(
         method="POST",
         path="/result",
