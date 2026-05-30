@@ -10,15 +10,22 @@ from app.models import (
     CommandResult,
     Device,
 )
-from app.schemas import CallbackRequest, PollCommandResponse, RegisterRequest, RegisterResponse
+from app.schemas import (
+    CallbackRequest,
+    PollCommandResponse,
+    RegisterRequest,
+    RegisterResponse,
+)
 from fastapi import APIRouter, Depends, HTTPException
-from security import public_key_id
-from security.encoding import b64decode
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from security import load_secure_transport_settings, public_key_id
+from security.encoding import b64decode
+
 router = APIRouter()
 LOGGER = logging.getLogger(__name__)
+secure_settings = load_secure_transport_settings(default_identity="iot-server")
 
 
 def validate_device_public_key(
@@ -27,7 +34,9 @@ def validate_device_public_key(
     if public_key_id_value is None and public_key_value is None:
         return None, None
     if public_key_id_value is None or public_key_value is None:
-        raise HTTPException(status_code=400, detail="Both public_key_id and public_key are required")
+        raise HTTPException(
+            status_code=400, detail="Both public_key_id and public_key are required"
+        )
 
     try:
         raw_public_key = b64decode(public_key_value)
@@ -35,9 +44,13 @@ def validate_device_public_key(
         raise HTTPException(status_code=400, detail="public_key must be base64 encoded")
 
     if len(raw_public_key) != 32:
-        raise HTTPException(status_code=400, detail="public_key must decode to 32 bytes")
+        raise HTTPException(
+            status_code=400, detail="public_key must decode to 32 bytes"
+        )
     if public_key_id(raw_public_key) != public_key_id_value:
-        raise HTTPException(status_code=400, detail="public_key_id does not match public_key")
+        raise HTTPException(
+            status_code=400, detail="public_key_id does not match public_key"
+        )
 
     return public_key_id_value, public_key_value
 
@@ -45,12 +58,47 @@ def validate_device_public_key(
 @router.post("/agent/register", response_model=RegisterResponse)
 def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
     """Registers a new agent or restores online status for an existing one. Returns device_id and registration status."""
-    public_key_id_value, public_key_value = validate_device_public_key(data.public_key_id, data.public_key)
+    public_key_id_value, public_key_value = validate_device_public_key(
+        data.public_key_id, data.public_key
+    )
     device = db.query(Device).filter(Device.name == data.name).first()
+
+    if secure_settings.enabled:
+        if device is None:
+            LOGGER.warning("Secure registration rejected for unknown device")
+            raise HTTPException(status_code=403, detail="Device is not pre-registered")
+
+        if public_key_id_value is None or public_key_value is None:
+            LOGGER.warning(
+                "Secure registration rejected for device without submitted public key: '%s'",
+                device.name,
+            )
+            raise HTTPException(status_code=403, detail="Device public key is required")
+
+        if device.public_key_id is None or device.public_key is None:
+            LOGGER.warning(
+                "Secure registration rejected for device without provisioned public key: '%s'",
+                device.name,
+            )
+            raise HTTPException(
+                status_code=403, detail="Device public key is not provisioned"
+            )
+
+        if (
+            device.public_key_id != public_key_id_value
+            or device.public_key != public_key_value
+        ):
+            LOGGER.warning(
+                "Secure registration rejected for device key mismatch: '%s'",
+                device.name,
+            )
+            raise HTTPException(status_code=403, detail="Device public key mismatch")
 
     if device:
         if device.is_deleted:
-            LOGGER.warning(f"Registration attempt rejected for deleted device: '{data.name}'")
+            LOGGER.warning(
+                f"Registration attempt rejected for deleted device: '{data.name}'"
+            )
             raise HTTPException(status_code=400, detail="Device has been deleted")
 
         if public_key_id_value is not None:
@@ -61,8 +109,12 @@ def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
                 device.public_key_id != public_key_id_value
                 or device.public_key != public_key_value
             ):
-                LOGGER.warning(f"Registration attempt rejected for device key mismatch: '{data.name}'")
-                raise HTTPException(status_code=400, detail="Device public key mismatch")
+                LOGGER.warning(
+                    f"Registration attempt rejected for device key mismatch: '{data.name}'"
+                )
+                raise HTTPException(
+                    status_code=400, detail="Device public key mismatch"
+                )
 
         device.status = "online"
         device.last_seen = datetime.now(timezone.utc)
@@ -88,7 +140,11 @@ def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
 def poll_commands(device_id: int, db: Session = Depends(get_db)):
     """Checks device status and returns the next pending task from the execution queue, if available."""
     try:
-        device = db.query(Device).filter(Device.id == device_id, Device.is_deleted == False).first()
+        device = (
+            db.query(Device)
+            .filter(Device.id == device_id, Device.is_deleted == False)
+            .first()
+        )
 
         if not device:
             raise HTTPException(status_code=404, detail="Device not found")
@@ -111,10 +167,14 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
 
         if not queue:
             db.commit()
-            return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
+            return PollCommandResponse(
+                queue_id=None, function_code=None, parameters=None
+            )
 
         command = (
-            db.query(Command).filter(Command.id == queue.command_id, Command.is_deleted == False).first()
+            db.query(Command)
+            .filter(Command.id == queue.command_id, Command.is_deleted == False)
+            .first()
         )
 
         if not command:
@@ -122,17 +182,24 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
                 f"Queue entry {queue.id} references a missing or deleted command (ID: {queue.command_id}), skipping."
             )
             db.commit()
-            return PollCommandResponse(queue_id=None, function_code=None, parameters=None)
+            return PollCommandResponse(
+                queue_id=None, function_code=None, parameters=None
+            )
 
         params = (
             db.query(CommandParameter)
-            .filter(CommandParameter.command_id == command.id, CommandParameter.is_deleted == False)
+            .filter(
+                CommandParameter.command_id == command.id,
+                CommandParameter.is_deleted == False,
+            )
             .all()
         )
 
         params = ", ".join([p.name for p in params])
         function_def = f"def _sicc_command({params}):\n"
-        indented_code = "\n".join(f"\t{line}" for line in command.python_code.splitlines())
+        indented_code = "\n".join(
+            f"\t{line}" for line in command.python_code.splitlines()
+        )
         function_code = function_def + indented_code + "\n"
 
         if not execution_id:
@@ -146,7 +213,9 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
             f"Task dispatched to device ID {device_id} (Queue ID: {queue.id}, Command ID: {command.id})"
         )
         return PollCommandResponse(
-            queue_id=queue.id, function_code=function_code, parameters=queue.parameters or {}
+            queue_id=queue.id,
+            function_code=function_code,
+            parameters=queue.parameters or {},
         )
 
     except HTTPException:
@@ -172,13 +241,17 @@ def receive_callback(data: CallbackRequest, db: Session = Depends(get_db)):
         else:
             device.status = "online"
 
-        result = CommandResult(queue_id=data.queue_id, is_error=data.is_error, result=data.result)
+        result = CommandResult(
+            queue_id=data.queue_id, is_error=data.is_error, result=data.result
+        )
         db.add(result)
 
         db.commit()
 
         if data.is_error:
-            LOGGER.warning(f"Task reported failure (Queue ID: {data.queue_id}): {data.result}")
+            LOGGER.warning(
+                f"Task reported failure (Queue ID: {data.queue_id}): {data.result}"
+            )
         else:
             LOGGER.info(f"Task result acknowledged (Queue ID: {data.queue_id})")
 
