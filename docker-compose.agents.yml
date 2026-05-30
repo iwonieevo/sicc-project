@@ -5,7 +5,9 @@ networks:
 
 services:
   agent:
-    build: ./agents
+    build:
+      context: .
+      dockerfile: agents/Dockerfile
     image: sicc-agent:latest
     container_name: ${AGENT_NAME}
     env_file:
@@ -14,6 +16,8 @@ services:
     environment:
       - IOT_SERVER_URL=http://iot-server:7000
       - AGENT_NAME=${AGENT_NAME}
+    volumes:
+      - ./security:/app/security:ro
     networks:
       - agent-net
     restart: unless-stopped

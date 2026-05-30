@@ -15,11 +15,14 @@ services:
       - public
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "${BACKEND_EXPOSED_PORT}:8000"
     volumes:
       - ./backend:/app
+      - ./security:/app/security:ro
       - type: bind
         source: ./db/certs
         target: /run/secrets/db-certs
@@ -46,11 +49,14 @@ services:
       - internal
 
   iot-server:
-    build: ./server-iot
+    build:
+      context: .
+      dockerfile: server-iot/Dockerfile
     ports:
       - "${IOT_SERVER_EXPOSED_PORT}:7000"
     volumes:
       - ./server-iot:/app
+      - ./security:/app/security:ro
       - type: bind
         source: ./db/certs
         target: /run/secrets/db-certs
