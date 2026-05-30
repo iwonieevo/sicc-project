@@ -774,6 +774,14 @@ class TestReplayState:
         with pytest.raises(ReplayError):
             direction.accept_recv_seq(3)
 
+    def test_check_recv_seq_does_not_advance(self):
+        state = SessionReplayState()
+        direction = state.state_for(Direction.CLIENT_TO_SERVER)
+        direction.check_recv_seq(0)
+        direction.check_recv_seq(0)
+        direction.accept_recv_seq(0)
+        assert direction.next_recv_seq == 1
+
     def test_rejects_older_seq(self):
         state = SessionReplayState()
         direction = state.state_for(Direction.CLIENT_TO_SERVER)

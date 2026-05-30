@@ -71,7 +71,7 @@ def create_handshake_start(
 ) -> tuple[HandshakeStart, KeyPair]:
     """Create the client's initial handshake message and X25519 ephemeral keypair."""
 
-    assert settings.enabled, "secure transport is disabled"
+    _require_enabled(settings)
 
     if settings.key_id is None:
         raise ValueError("local service key id is not configured")
@@ -102,7 +102,7 @@ def create_server_handshake(
 ) -> ServerHandshake:
     """Validate a client start message, sign the transcript, and derive server keys."""
 
-    assert settings.enabled, "secure transport is disabled"
+    _require_enabled(settings)
 
     _validate_start(
         settings,
@@ -154,7 +154,7 @@ def complete_client_handshake(
 ) -> ClientHandshake:
     """Verify the server's signed transcript, then sign it as the client."""
 
-    assert settings.enabled, "secure transport is disabled"
+    _require_enabled(settings)
 
     if start.client_identity != settings.identity:
         raise ValueError("unexpected client identity")
@@ -201,7 +201,7 @@ def verify_client_handshake_signature(
 ) -> None:
     """Verify the client's final signature over an already-built transcript."""
 
-    assert settings.enabled, "secure transport is disabled"
+    _require_enabled(settings)
 
     client_public_key = settings.trusted_public_key(transcript.client_key_id)
     verify_transcript_signature(client_public_key, transcript, client_signature)
@@ -234,3 +234,8 @@ def _validate_timestamp(value: int, max_skew_ms: int, timestamp_ms: int | None) 
     current = now_ms() if timestamp_ms is None else timestamp_ms
     if abs(current - value) > max_skew_ms:
         raise StaleMessageError("handshake timestamp is outside allowed skew")
+
+
+def _require_enabled(settings: SecureTransportSettings) -> None:
+    if not settings.enabled:
+        raise ValueError("secure transport is disabled")

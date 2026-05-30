@@ -170,11 +170,8 @@ def handle_encrypted_backend_iot_request(request: BackendIotEncryptedRequest):
 
     with session.lock:
         try:
-            # Sequence validation happens before decryption so replayed envelopes fail
-            # even if their ciphertext would otherwise authenticate.
-            session.replay.state_for(Direction.CLIENT_TO_SERVER).accept_recv_seq(
-                envelope.seq
-            )
+            recv_state = session.replay.state_for(Direction.CLIENT_TO_SERVER)
+            recv_state.check_recv_seq(envelope.seq)
             request_body = decrypt_envelope(
                 envelope,
                 session.keys,
@@ -182,6 +179,7 @@ def handle_encrypted_backend_iot_request(request: BackendIotEncryptedRequest):
                 Direction.CLIENT_TO_SERVER,
                 max_skew_ms=settings.max_skew_ms,
             )
+            recv_state.accept_recv_seq(envelope.seq)
             response_body = _dispatch_plaintext_request(request_body)
             seq = session.replay.state_for(Direction.SERVER_TO_CLIENT).allocate_send_seq()
             response_envelope = encrypt_envelope(

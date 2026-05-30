@@ -21,9 +21,14 @@ class DirectionState:
     def accept_recv_seq(self, seq: int) -> None:
         """Accept only the exact next inbound sequence number for this direction."""
 
+        self.check_recv_seq(seq)
+        self.next_recv_seq += 1
+
+    def check_recv_seq(self, seq: int) -> None:
+        """Validate the next inbound sequence number without committing it."""
+
         if seq != self.next_recv_seq:
             raise ReplayError(f"expected seq {self.next_recv_seq}, got {seq}")
-        self.next_recv_seq += 1
 
 
 @dataclass

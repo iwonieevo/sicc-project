@@ -7,6 +7,7 @@ import httpx
 
 from security import (
     ROLE_BACKEND_IOT,
+    CryptoError,
     Direction,
     HandshakeStart,
     SecureEnvelope,
@@ -133,16 +134,23 @@ def forward_secure_backend_iot_request(
         )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code != 404:
+            _discard_backend_iot_sessions()
             raise
         LOGGER.info("Backend-IoT secure session missing remotely; handshaking again")
-        with session_creation_lock:
-            session_store.clear()
-        return _forward_secure_backend_iot_request(
-            method=method,
-            path=path,
-            json_data=json_data,
-            params=params,
-        )
+        _discard_backend_iot_sessions()
+        try:
+            return _forward_secure_backend_iot_request(
+                method=method,
+                path=path,
+                json_data=json_data,
+                params=params,
+            )
+        except (httpx.HTTPError, CryptoError, ValueError):
+            _discard_backend_iot_sessions()
+            raise
+    except (httpx.HTTPError, CryptoError, ValueError):
+        _discard_backend_iot_sessions()
+        raise
 
 
 def _forward_secure_backend_iot_request(
@@ -197,6 +205,13 @@ def _forward_secure_backend_iot_request(
 
 def _iot_url(path: str) -> str:
     return f"{IOT_SERVER_URL.rstrip('/')}{path}"
+
+
+def _discard_backend_iot_sessions() -> None:
+    """Drop local session state after ambiguous secure transport failure."""
+
+    with session_creation_lock:
+        session_store.clear()
 
 
 def _start_to_payload(start: HandshakeStart) -> dict[str, Any]:
