@@ -5,6 +5,7 @@ import { useAuth } from "~/providers/AuthProvider";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { formatParameterValue } from "~/lib/utils";
+import { ListPagination } from "~/components/list-pagination";
 
 interface CommandLog {
   queue_id: number;
@@ -25,6 +26,7 @@ export default function Page() {
   const { user, loading } = useAuth();
   const [logs, setLogs] = useState<CommandLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
+  const [limit, setLimit] = useState(10);
 
   const fetchLogs = async (silent = false) => {
     if (!user) return;
@@ -32,7 +34,11 @@ export default function Page() {
       setLoadingLogs(true);
     try {
       const token = localStorage.getItem("accessToken");
-      fetch('/api/logs', {
+      let url = `/api/logs?limit=${limit}`;
+      if (limit === -1) {
+        url = `/api/logs`;
+      }
+      fetch(url, {
         credentials: "include",
         headers: { "Authorization": `Bearer ${token}` }
       })
@@ -58,7 +64,7 @@ export default function Page() {
     // fetch logs every 2 seconds to keep the view updated
     const interval = setInterval(() => fetchLogs(true), 2000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, limit]);
 
   if (loading) {
     return (
@@ -97,6 +103,7 @@ export default function Page() {
             </CardAction>
           </CardHeader>
           <CardContent>
+            <ListPagination limit={limit} onLimitChange={setLimit} />
             <div className="space-y-3">
               {logs.map((log) => (
                 <div key={log.queue_id} className="p-3 border-l-4">

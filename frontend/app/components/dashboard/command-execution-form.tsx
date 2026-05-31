@@ -91,7 +91,18 @@ export function CommandExecutionForm({
 
                 if (devicesRes.ok) {
                     const devicesData = await devicesRes.json();
-                    setDevices(devicesData || []);
+                    if (devicesData.length > 0) {
+                        setDevices([
+                            {
+                                id: -1,
+                                name: "Any Device",
+                                status: "online"
+                            },
+                            ...devicesData]);
+                    }
+                    else {
+                        setDevices([]);
+                    }
                 }
 
                 if (commandsRes.ok) {
@@ -192,7 +203,11 @@ export function CommandExecutionForm({
                 }
             }
 
-            const response = await fetch("/api/execute", {
+            let url = "/api/execute";
+            if (selectedDevice === "-1") {
+                url = "/api/execute/any";
+            }
+            const response = await fetch(url, {
                 method: "POST",
                 credentials: "include",
                 headers: {

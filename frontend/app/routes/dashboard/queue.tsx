@@ -5,6 +5,7 @@ import { useAuth } from "~/providers/AuthProvider";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { formatParameterValue } from "~/lib/utils";
+import { ListPagination } from "~/components/list-pagination";
 
 interface Device {
     id: number;
@@ -30,7 +31,8 @@ export default function QueuePage() {
     const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
     const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
     const [loadingData, setLoadingData] = useState(true);
-    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('oldest');
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+    const [limit, setLimit] = useState(10);
 
     useEffect(() => {
         if (!user) return;
@@ -61,7 +63,11 @@ export default function QueuePage() {
         if (!silent) setLoadingData(true);
         try {
             const token = localStorage.getItem("accessToken");
-            const res = await fetch(`/api/devices/${selectedDeviceId}/queue`, {
+            let url = `/api/devices/${selectedDeviceId}/queue?limit=${limit}`;
+            if (limit === -1) {
+                url = `/api/devices/${selectedDeviceId}/queue`;
+            }
+            const res = await fetch(url, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (res.ok) {
@@ -79,7 +85,7 @@ export default function QueuePage() {
         fetchQueue();
         const interval = setInterval(() => fetchQueue(true), 2000);
         return () => clearInterval(interval);
-    }, [selectedDeviceId, user]);
+    }, [selectedDeviceId, user, limit]);
 
     const handleCancel = async (queueId: number) => {
         if (!selectedDeviceId) return;
@@ -143,6 +149,7 @@ export default function QueuePage() {
                             </CardAction>
                         </CardHeader>
                         <CardContent>
+                            <ListPagination limit={limit} onLimitChange={setLimit} />
                             <div className="space-y-3">
                                 {queueItems.length === 0 ? (
                                     <div className="text-center text-gray-500 py-8">Queue is empty</div>
