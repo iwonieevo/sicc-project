@@ -31,7 +31,7 @@ export default function QueuePage() {
     const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
     const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
     const [loadingData, setLoadingData] = useState(true);
-    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('oldest');
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [limit, setLimit] = useState(10);
 
     useEffect(() => {
