@@ -14,6 +14,7 @@ from security import (
     StaleMessageError,
     decrypt_envelope,
     derive_session_keys,
+    ed25519_public_key_from_private_key,
     encrypt_envelope,
     generate_ed25519_keypair,
     generate_x25519_keypair,
@@ -65,6 +66,15 @@ def _derived_keys(
     return derive_session_keys(
         client_eph.private_key, server_eph.public_key, transcript
     )
+
+
+def test_ed25519_public_key_can_be_derived_from_private_key():
+    keypair = generate_ed25519_keypair()
+
+    derived_public_key = ed25519_public_key_from_private_key(keypair.private_key)
+
+    assert derived_public_key == keypair.public_key
+    assert public_key_id(derived_public_key) == public_key_id(keypair.public_key)
 
 
 def test_transcript_signature_verification_accepts_matching_transcript():

@@ -177,6 +177,18 @@ def generate_ed25519_keypair() -> KeyPair:
     )
 
 
+def ed25519_public_key_from_private_key(private_key: bytes) -> bytes:
+    """Derive the raw Ed25519 public key bytes for a raw private key."""
+
+    _require_len("private_key", private_key, 32)
+
+    private = ed25519.Ed25519PrivateKey.from_private_bytes(private_key)
+    return private.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+
+
 def generate_x25519_keypair() -> KeyPair:
     private = x25519.X25519PrivateKey.generate()
     return KeyPair(

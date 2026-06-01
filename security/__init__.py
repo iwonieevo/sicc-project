@@ -7,6 +7,7 @@ from .crypto import (
     SecureEnvelope,
     decrypt_envelope,
     derive_session_keys,
+    ed25519_public_key_from_private_key,
     encrypt_envelope,
     generate_ed25519_keypair,
     generate_x25519_keypair,
@@ -25,6 +26,7 @@ from .errors import (
 from .replay import DirectionState, SessionReplayState
 from .settings import SecureTransportSettings, load_secure_transport_settings
 from .service_handshake import (
+    ROLE_AGENT_IOT,
     ROLE_BACKEND_IOT,
     ClientHandshake,
     HandshakeStart,
@@ -50,6 +52,7 @@ __all__ = [
     "HandshakeTranscript",
     "HandshakeStart",
     "KeyPair",
+    "ROLE_AGENT_IOT",
     "ROLE_BACKEND_IOT",
     "ReplayError",
     "SecureEnvelope",
@@ -65,6 +68,7 @@ __all__ = [
     "create_server_handshake",
     "decrypt_envelope",
     "derive_session_keys",
+    "ed25519_public_key_from_private_key",
     "encrypt_envelope",
     "generate_ed25519_keypair",
     "generate_x25519_keypair",

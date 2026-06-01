@@ -17,6 +17,7 @@ from .errors import StaleMessageError
 from .settings import SecureTransportSettings
 
 ROLE_BACKEND_IOT = "backend-iot"
+ROLE_AGENT_IOT = "agent-iot"
 
 
 @dataclass(frozen=True)

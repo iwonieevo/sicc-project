@@ -98,6 +98,7 @@ app.include_router(commands.router)
 app.include_router(agent.router)
 app.include_router(execute.router)
 app.include_router(secure.router)
+app.include_router(secure.agent_iot_router)
 
 
 @app.get("/")

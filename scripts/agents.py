@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -33,6 +34,49 @@ def run_cmd(cmd: list[str], env_extra: dict | None = None) -> int:
     return subprocess.run(cmd, env=env).returncode
 
 
+def looks_like_env_path(value: str) -> bool:
+    path = Path(value)
+    return (
+        "/" in value
+        or "\\" in value
+        or value.endswith(".env")
+        or value.startswith(".env")
+        or path.exists()
+    )
+
+
+def parse_start_specs(items: list[str]) -> list[tuple[str, str | None]]:
+    specs = []
+    index = 0
+    while index < len(items):
+        name = items[index]
+        if looks_like_env_path(name):
+            raise SystemExit(f"Expected agent name, got env path: {name}")
+
+        env_path = None
+        next_index = index + 1
+        if next_index < len(items) and looks_like_env_path(items[next_index]):
+            env_path = items[next_index]
+            index += 2
+        else:
+            index += 1
+
+        specs.append((name, env_path))
+    return specs
+
+
+def load_agent_env_file(path: str | None) -> dict:
+    env = load_dotenv("env/.env.agent")
+    if path is None:
+        return env
+
+    resolved = Path(path)
+    if not resolved.is_file():
+        raise SystemExit(f"Agent env file not found: {path}")
+    env.update(load_dotenv(str(resolved)))
+    return env
+
+
 def get_agent_names(running_only=False) -> list[str]:
     cmd = ["docker", "ps", "--filter", f"label={get_agent_label()}", "--format", "{{.Names}}"]
     if not running_only:
@@ -45,21 +89,25 @@ def get_agent_names(running_only=False) -> list[str]:
 
 
 def cmd_start(args):
-    for name in args.names:
+    for name, env_path in parse_start_specs(args.items):
         existing = subprocess.run(
             ["docker", "ps", "-a", "-q", "--filter", f"name=^/{name}$"],
             capture_output=True, text=True
         ).stdout.strip()
 
         if existing:
+            if env_path:
+                print(f"Env file ignored for existing container {name}; remove it first to change env.", file=sys.stderr)
             print(f"Resuming: {name}")
             code = run_cmd(["docker", "start", name])
         else:
-            print(f"Starting: {name}")
+            print(f"Starting: {name}" + (f" ({env_path})" if env_path else ""))
+            agent_env = load_agent_env_file(env_path)
+            agent_env["AGENT_NAME"] = name
             code = run_cmd(
                 ["docker", "compose", "-f", COMPOSE_FILE, "-p", COMPOSE_PROJECT,
                  "run", "-d", "--name", name, "agent"],
-                env_extra={"AGENT_NAME": name}
+                env_extra=agent_env
             )
 
         if code != 0:
@@ -136,7 +184,12 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("start", help="Start one or more agents")
-    p.add_argument("names", nargs="+", metavar="name")
+    p.add_argument(
+        "items",
+        nargs="+",
+        metavar="name [env_file]",
+        help="Agent names, optionally followed by per-agent env file paths",
+    )
     p.set_defaults(func=cmd_start)
 
     p = sub.add_parser("stop", help="Stop one or more agents (container kept)")

@@ -24,41 +24,49 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ### `.env`
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `FRONTEND_EXPOSED_PORT` | `3000` | Host port for the frontend |
-| `BACKEND_EXPOSED_PORT` | `8000` | Host port for the backend |
-| `IOT_SERVER_EXPOSED_PORT` | `7000` | Host port for the IoT server |
-| `POSTGRES_EXPOSED_PORT` | `5432` | Host port for PostgreSQL |
-| `AGENT_NET_NAME` | `sicc-agent-net` | Docker network shared between infra and agents |
-| `AGENT_LABEL` | `sicc.role=agent` | Label applied to agent containers |
-| `POSTGRES_DB` | `sicc` | Database name |
-| `POSTGRES_USER` | `admin` | Postgres superuser name |
-| `POSTGRES_PASSWORD` | `changeme` | Postgres superuser password |
-| `DB_BACKEND_PASSWORD` | `changeme` | DB password for the backend service |
-| `DB_IOT_PASSWORD` | `changeme` | DB password for the IoT server |
-| `ENV` | `development` | Runtime environment (`development` / `production`) |
+| Variable                  | Default           | Description                                        |
+| ------------------------- | ----------------- | -------------------------------------------------- |
+| `FRONTEND_EXPOSED_PORT`   | `3000`            | Host port for the frontend                         |
+| `BACKEND_EXPOSED_PORT`    | `8000`            | Host port for the backend                          |
+| `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port for the IoT server                       |
+| `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port for PostgreSQL                           |
+| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents     |
+| `AGENT_LABEL`             | `sicc.role=agent` | Label applied to agent containers                  |
+| `POSTGRES_DB`             | `sicc`            | Database name                                      |
+| `POSTGRES_USER`           | `admin`           | Postgres superuser name                            |
+| `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                        |
+| `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service                |
+| `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server                     |
+| `ENV`                     | `development`     | Runtime environment (`development` / `production`) |
 
 ### `env/.env.agent`
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `POLL_INTERVAL` | `2` | Seconds between command polls to the IoT server |
-| `REGISTRATION_ATTEMPTS` | `10` | Number of registration retries on startup |
+| Variable                        | Default      | Description                                     |
+| ------------------------------- | ------------ | ----------------------------------------------- |
+| `POLL_INTERVAL`                 | `2`          | Seconds between command polls to the IoT server |
+| `REGISTRATION_ATTEMPTS`         | `10`         | Number of registration retries on startup       |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON` | `{}`         | Common trusted service public keys for agents   |
+| `SICC_IOT_SERVER_IDENTITY`      | `iot-server` | Expected IoT server service identity            |
+| `SICC_IOT_SERVER_KEY_ID`        | empty        | IoT server public key id used by agents         |
+| `SICC_MAX_SKEW_MS`              | `30000`      | Maximum secure-message timestamp skew           |
+
+Per-agent identity keys should not be stored in the shared `env/.env.agent` file.
+Place them in a private env file and pass that path to `scripts/agents.py start`.
+Files under `env/agents/` are ignored by git.
 
 ### `env/.env.backend`
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `JWT_SECRET_KEY` | `changeme` | Secret used to sign JWTs |
-| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token lifetime in minutes |
+| Variable                          | Default    | Description               |
+| --------------------------------- | ---------- | ------------------------- |
+| `JWT_SECRET_KEY`                  | `changeme` | Secret used to sign JWTs  |
+| `JWT_ALGORITHM`                   | `HS256`    | JWT signing algorithm     |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`       | Token lifetime in minutes |
 
 ### `env/.env.server-iot`
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15` | Seconds between health checks to mark inactive agents offline |
+| Variable                          | Default | Description                                                   |
+| --------------------------------- | ------- | ------------------------------------------------------------- |
+| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`    | Seconds between health checks to mark inactive agents offline |
 
 ---
 
@@ -104,12 +112,31 @@ Agents are managed via the `agents.py` script:
 
 ```bash
 python scripts/agents.py start agent-alpha
+python scripts/agents.py start agent-alpha env/agents/.env.alpha
 python scripts/agents.py start agent-alpha agent-beta agent-gamma
+python scripts/agents.py start agent-alpha env/agents/.env.alpha agent-beta env/agents/.env.beta
 ```
 
 The agent name is arbitrary — any string matching `[a-zA-Z0-9][a-zA-Z0-9_.-]+` is valid.
 
+When `SECURE_MODE=true`, each agent needs a private per-agent env file with its own
+identity and Ed25519 key:
+
+```env
+SICC_SERVICE_IDENTITY=agent-alpha
+SICC_SERVICE_KEY_ID=...
+SICC_SERVICE_PRIVATE_KEY_B64=...
+```
+
+Generate these values with:
+
+```bash
+python scripts/generate-security-key.py
+```
+
 On first run, the agent container is created. On subsequent runs of the same name, the existing stopped container is resumed.
+
+> Note: Changing an env file does not update an existing container.
 
 ---
 
@@ -192,9 +219,9 @@ python scripts/agents.py logs agent-alpha -f
 
 ```txt
 python scripts/agents.py <command> [args]
- 
+
 Commands:
-  start <name> [name ...]   Create or resume agent(s)
+  start <name> [env_file] [name [env_file] ...]   Create or resume agent(s)
   stop  <name> [name ...]   Stop agent(s), keep containers  [--all]
   down  <name> [name ...]   Stop and remove agent(s)        [--all]
   logs  <name>              Show logs for one agent         [-f] [--tail N]

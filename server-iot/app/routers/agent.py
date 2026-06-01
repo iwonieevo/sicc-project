@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timezone
 
+from app.agent_security import require_agent_transport
+from app.agent_security import settings as secure_settings
 from app.database import get_db
 from app.models import (
     Command,
@@ -16,16 +18,15 @@ from app.schemas import (
     RegisterRequest,
     RegisterResponse,
 )
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from security import load_secure_transport_settings, public_key_id
+from security import public_key_id
 from security.encoding import b64decode
 
 router = APIRouter()
 LOGGER = logging.getLogger(__name__)
-secure_settings = load_secure_transport_settings(default_identity="iot-server")
 
 
 def validate_device_public_key(
@@ -56,8 +57,15 @@ def validate_device_public_key(
 
 
 @router.post("/agent/register", response_model=RegisterResponse)
-def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
+def register_agent(
+    data: RegisterRequest, request: Request, db: Session = Depends(get_db)
+):
     """Registers a new agent or restores online status for an existing one. Returns device_id and registration status."""
+
+    secure_identity = require_agent_transport(request)
+    if secure_identity is not None and secure_identity != data.name:
+        raise HTTPException(status_code=403, detail="Agent identity mismatch")
+
     public_key_id_value, public_key_value = validate_device_public_key(
         data.public_key_id, data.public_key
     )
@@ -137,9 +145,10 @@ def register_agent(data: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/agent/{device_id}/commands", response_model=PollCommandResponse)
-def poll_commands(device_id: int, db: Session = Depends(get_db)):
+def poll_commands(device_id: int, request: Request, db: Session = Depends(get_db)):
     """Checks device status and returns the next pending task from the execution queue, if available."""
     try:
+        secure_identity = require_agent_transport(request)
         device = (
             db.query(Device)
             .filter(Device.id == device_id, Device.is_deleted == False)
@@ -148,6 +157,9 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
 
         if not device:
             raise HTTPException(status_code=404, detail="Device not found")
+
+        if secure_identity is not None and device.name != secure_identity:
+            raise HTTPException(status_code=403, detail="Agent identity mismatch")
 
         device.last_seen = datetime.now(timezone.utc)
         device.status = "online"
@@ -226,9 +238,12 @@ def poll_commands(device_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/agent/callback")
-def receive_callback(data: CallbackRequest, db: Session = Depends(get_db)):
+def receive_callback(
+    data: CallbackRequest, request: Request, db: Session = Depends(get_db)
+):
     """Records the execution result reported by an agent and restores its online status."""
     try:
+        secure_identity = require_agent_transport(request)
         queue = db.query(CommandQueue).filter(CommandQueue.id == data.queue_id).first()
         if not queue:
             raise HTTPException(status_code=404, detail="Queue entry not found")
@@ -239,6 +254,8 @@ def receive_callback(data: CallbackRequest, db: Session = Depends(get_db)):
                 f"Device not found when processing callback for Queue ID {data.queue_id} (Device ID: {queue.device_id})"
             )
         else:
+            if secure_identity is not None and device.name != secure_identity:
+                raise HTTPException(status_code=403, detail="Agent identity mismatch")
             device.status = "online"
 
         result = CommandResult(
