@@ -8,6 +8,7 @@ class RegisterRequest(BaseModel):
     name: str = Field(..., description="Agent hostname or identifier")
     public_key_id: Optional[str] = None
     public_key: Optional[str] = None
+    enrollment_token: Optional[str] = None
 
 
 class RegisterResponse(BaseModel):

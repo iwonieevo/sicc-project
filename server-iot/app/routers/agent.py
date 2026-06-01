@@ -1,9 +1,11 @@
 import logging
+import os
 from datetime import datetime, timezone
 
-from app.agent_security import require_agent_transport
+from app.agent_security import INTERNAL_AGENT_TOKEN_HEADER, require_agent_transport
 from app.agent_security import settings as secure_settings
 from app.database import get_db
+from app.enrollment import verify_enrollment_token
 from app.models import (
     Command,
     CommandExecution,
@@ -62,7 +64,9 @@ def register_agent(
 ):
     """Registers a new agent or restores online status for an existing one. Returns device_id and registration status."""
 
-    secure_identity = require_agent_transport(request)
+    secure_identity = None
+    if request.headers.get(INTERNAL_AGENT_TOKEN_HEADER) is not None:
+        secure_identity = require_agent_transport(request)
     if secure_identity is not None and secure_identity != data.name:
         raise HTTPException(status_code=403, detail="Agent identity mismatch")
 
@@ -72,27 +76,33 @@ def register_agent(
     device = db.query(Device).filter(Device.name == data.name).first()
 
     if secure_settings.enabled:
-        if device is None:
-            LOGGER.warning("Secure registration rejected for unknown device")
-            raise HTTPException(status_code=403, detail="Device is not pre-registered")
-
         if public_key_id_value is None or public_key_value is None:
             LOGGER.warning(
-                "Secure registration rejected for device without submitted public key: '%s'",
-                device.name,
+                "Secure registration rejected without submitted public key: '%s'",
+                data.name,
             )
             raise HTTPException(status_code=403, detail="Device public key is required")
 
-        if device.public_key_id is None or device.public_key is None:
-            LOGGER.warning(
-                "Secure registration rejected for device without provisioned public key: '%s'",
-                device.name,
-            )
-            raise HTTPException(
-                status_code=403, detail="Device public key is not provisioned"
-            )
-
-        if (
+        if device is None or (
+            device.public_key_id is None and device.public_key is None
+        ):
+            enrollment_secret = os.getenv("SICC_AGENT_ENROLLMENT_SECRET")
+            if enrollment_secret is None:
+                LOGGER.warning("Secure registration rejected without enrollment secret")
+                raise HTTPException(
+                    status_code=500, detail="Agent enrollment is not configured"
+                )
+            if data.enrollment_token is None or not verify_enrollment_token(
+                enrollment_secret, data.enrollment_token, data.name
+            ):
+                LOGGER.warning(
+                    "Secure registration rejected for invalid enrollment token: '%s'",
+                    data.name,
+                )
+                raise HTTPException(
+                    status_code=403, detail="Device enrollment token is invalid"
+                )
+        elif (
             device.public_key_id != public_key_id_value
             or device.public_key != public_key_value
         ):

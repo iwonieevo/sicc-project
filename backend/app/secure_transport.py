@@ -22,7 +22,7 @@ from security import (
 from security.encoding import b64decode, b64encode
 
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
-IOT_SERVER_IDENTITY = os.getenv("SICC_IOT_SERVER_IDENTITY", "iot-server")
+IOT_SERVER_IDENTITY = os.getenv("SICC_IOT_SERVER_IDENTITY")
 IOT_SERVER_KEY_ID = os.getenv("SICC_IOT_SERVER_KEY_ID")
 
 LOGGER = logging.getLogger(__name__)
@@ -37,21 +37,26 @@ def select_iot_server_key_id() -> str:
 
     if IOT_SERVER_KEY_ID:
         return IOT_SERVER_KEY_ID
-    if len(settings.trusted_public_keys) == 1:
-        return next(iter(settings.trusted_public_keys))
-    raise ValueError(
-        "SICC_IOT_SERVER_KEY_ID is required when multiple trusted keys exist"
-    )
+    raise ValueError("SICC_IOT_SERVER_KEY_ID is required when SECURE_MODE=true")
+
+
+def select_iot_server_identity() -> str:
+    """Return the configured IoT server identity used for backend-IoT handshakes."""
+
+    if IOT_SERVER_IDENTITY:
+        return IOT_SERVER_IDENTITY
+    raise ValueError("SICC_IOT_SERVER_IDENTITY is required when SECURE_MODE=true")
 
 
 def initiate_backend_iot_handshake(client: httpx.Client | None = None) -> SecureSession:
     """Perform the full backend-to-IoT mutual handshake and store the session."""
 
     server_key_id = select_iot_server_key_id()
+    server_identity = select_iot_server_identity()
     start, client_ephemeral = create_handshake_start(
         settings,
         role=ROLE_BACKEND_IOT,
-        server_identity=IOT_SERVER_IDENTITY,
+        server_identity=server_identity,
         server_key_id=server_key_id,
     )
     owns_client = client is None

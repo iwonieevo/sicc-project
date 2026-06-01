@@ -543,7 +543,7 @@ def _is_allowed_agent_forward(method: str, path: Any) -> bool:
     if any(segment in {".", ".."} for segment in segments):
         return False
 
-    if method == "POST" and path in {"/agent/register", "/agent/callback"}:
+    if method == "POST" and path == "/agent/callback":
         return True
 
     if method != "GET":

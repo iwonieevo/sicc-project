@@ -42,6 +42,7 @@ class Config:
     iot_server_url: str
     iot_server_identity: str
     iot_server_key_id: str | None
+    enrollment_token: str | None
     poll_interval: int
     registration_retries: int = 10
     request_timeout: int = 5
@@ -49,11 +50,16 @@ class Config:
     @classmethod
     def from_env(cls) -> "Config":
         """Creates a Config instance from environment variables, falling back to defaults."""
+        iot_server_identity = os.getenv("SICC_IOT_SERVER_IDENTITY")
+        if not iot_server_identity:
+            raise ValueError("SICC_IOT_SERVER_IDENTITY is required")
+
         return cls(
             agent_name=os.getenv("AGENT_NAME", socket.gethostname()),
             iot_server_url=os.getenv("IOT_SERVER_URL", "http://iot-server:7000"),
-            iot_server_identity=os.getenv("SICC_IOT_SERVER_IDENTITY", "iot-server"),
+            iot_server_identity=iot_server_identity,
             iot_server_key_id=os.getenv("SICC_IOT_SERVER_KEY_ID") or None,
+            enrollment_token=os.getenv("AGENT_ENROLLMENT_TOKEN") or None,
             poll_interval=int(os.getenv("POLL_INTERVAL", 2)),
         )
 
@@ -111,6 +117,10 @@ class SecureAgentTransport:
     def __init__(self, config: Config):
         self.config = config
         self.settings, self.public_key = self._load_settings(config.agent_name)
+        if self.settings.enabled and self.settings.identity != config.agent_name:
+            raise ValueError(
+                "SICC_SERVICE_IDENTITY must match AGENT_NAME when SECURE_MODE=true"
+            )
         self.client = httpx.Client(timeout=config.request_timeout)
         self.session_store = SecureSessionStore()
         self.session_creation_lock = threading.RLock()
@@ -124,6 +134,8 @@ class SecureAgentTransport:
 
     def registration_payload(self) -> dict[str, Any]:
         payload = {"name": self.config.agent_name}
+        if self.config.enrollment_token is not None:
+            payload["enrollment_token"] = self.config.enrollment_token
 
         if self.settings.enabled:
             if self.public_key is None or self.settings.key_id is None:
@@ -268,11 +280,7 @@ class SecureAgentTransport:
     def _select_iot_server_key_id(self) -> str:
         if self.config.iot_server_key_id:
             return self.config.iot_server_key_id
-        if len(self.settings.trusted_public_keys) == 1:
-            return next(iter(self.settings.trusted_public_keys))
-        raise ValueError(
-            "SICC_IOT_SERVER_KEY_ID is required when multiple trusted keys exist"
-        )
+        raise ValueError("SICC_IOT_SERVER_KEY_ID is required when SECURE_MODE=true")
 
     def _discard_sessions(self) -> None:
         with self.session_creation_lock:
@@ -464,24 +472,12 @@ class Agent:
         """Registers the agent synchronously with exponential backoff."""
         for attempt in range(1, self.config.registration_retries + 1):
             try:
-                if self.secure_transport.enabled:
-                    status_code, body = self.secure_transport.request(
-                        "POST",
-                        "/agent/register",
-                        json_data=self.secure_transport.registration_payload(),
-                    )
-                    if status_code >= 400:
-                        raise RuntimeError(
-                            f"registration failed with status {status_code}: {body}"
-                        )
-                    self.device_id = body["device_id"]
-                else:
-                    response = self.client.post(
-                        f"{self.config.iot_server_url}/agent/register",
-                        json={"name": self.config.agent_name},
-                    )
-                    response.raise_for_status()
-                    self.device_id = response.json()["device_id"]
+                response = self.client.post(
+                    f"{self.config.iot_server_url}/agent/register",
+                    json=self.secure_transport.registration_payload(),
+                )
+                response.raise_for_status()
+                self.device_id = response.json()["device_id"]
                 return True
             except Exception as e:
                 LOGGER.warning(f"Registration attempt {attempt} failed: {e}")

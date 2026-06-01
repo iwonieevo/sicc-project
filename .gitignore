@@ -2,7 +2,9 @@
 .env
 env/*
 !env/.env*.example
-env/agents/
+!env/agents/
+env/agents/*
+!env/agents/.env.agent-name.example
 db/certs/
 
 # OS

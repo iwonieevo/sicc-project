@@ -20,6 +20,7 @@ cp .env.example .env
 cp env/.env.agent.example env/.env.agent
 cp env/.env.backend.example env/.env.backend
 cp env/.env.server-iot.example env/.env.server-iot
+cp env/agents/.env.agent-name.example env/agents/.env.alpha
 ```
 
 ### `.env`
@@ -50,23 +51,48 @@ cp env/.env.server-iot.example env/.env.server-iot
 | `SICC_IOT_SERVER_KEY_ID`        | empty        | IoT server public key id used by agents         |
 | `SICC_MAX_SKEW_MS`              | `30000`      | Maximum secure-message timestamp skew           |
 
-Per-agent identity keys should not be stored in the shared `env/.env.agent` file.
-Place them in a private env file and pass that path to `scripts/agents.py start`.
-Files under `env/agents/` are ignored by git.
+`env/.env.agent` is shared by every agent container. Keep per-agent identity keys
+and enrollment tokens out of this file. Put those values in a private file under
+`env/agents/` and pass that path to `scripts/agents.py start`.
+
+Files under `env/agents/` are ignored by git except for `env/agents/.env.agent-name.example`.
+
+### `env/agents/.env.agent-name.example`
+
+| Variable                       | Default | Description                                        |
+| ------------------------------ | ------- | -------------------------------------------------- |
+| `AGENT_ENROLLMENT_TOKEN`       | empty   | Secure-mode registration token for this agent only |
+| `SICC_SERVICE_IDENTITY`        | empty   | Agent identity; must match the started agent name  |
+| `SICC_SERVICE_KEY_ID`          | empty   | Key id derived from this agent's public key        |
+| `SICC_SERVICE_PRIVATE_KEY_B64` | empty   | This agent's private Ed25519 service key           |
+| `SICC_SERVICE_PUBLIC_KEY_B64`  | empty   | This agent's public Ed25519 service key            |
 
 ### `env/.env.backend`
 
-| Variable                          | Default    | Description               |
-| --------------------------------- | ---------- | ------------------------- |
-| `JWT_SECRET_KEY`                  | `changeme` | Secret used to sign JWTs  |
-| `JWT_ALGORITHM`                   | `HS256`    | JWT signing algorithm     |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`       | Token lifetime in minutes |
+| Variable                          | Default      | Description                                      |
+| --------------------------------- | ------------ | ------------------------------------------------ |
+| `JWT_SECRET_KEY`                  | `changeme`   | Secret used to sign JWTs                         |
+| `JWT_ALGORITHM`                   | `HS256`      | JWT signing algorithm                            |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`         | Token lifetime in minutes                        |
+| `SICC_SERVICE_IDENTITY`           | `backend`    | Backend secure-transport identity                |
+| `SICC_SERVICE_KEY_ID`             | empty        | Backend key id derived from its public key       |
+| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty        | Backend private Ed25519 service key              |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`         | Trusted public keys; must include the IoT server |
+| `SICC_IOT_SERVER_IDENTITY`        | `iot-server` | Expected IoT server service identity             |
+| `SICC_IOT_SERVER_KEY_ID`          | empty        | Required IoT server public key id                |
+| `SICC_MAX_SKEW_MS`                | `30000`      | Maximum secure-message timestamp skew            |
 
 ### `env/.env.server-iot`
 
-| Variable                          | Default | Description                                                   |
-| --------------------------------- | ------- | ------------------------------------------------------------- |
-| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`    | Seconds between health checks to mark inactive agents offline |
+| Variable                          | Default      | Description                                                   |
+| --------------------------------- | ------------ | ------------------------------------------------------------- |
+| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`         | Seconds between health checks to mark inactive agents offline |
+| `SICC_AGENT_ENROLLMENT_SECRET`    | empty        | Secret used to verify signed agent enrollment tokens          |
+| `SICC_SERVICE_IDENTITY`           | `iot-server` | IoT server secure-transport identity                          |
+| `SICC_SERVICE_KEY_ID`             | empty        | IoT server key id derived from its public key                 |
+| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty        | IoT server private Ed25519 service key                        |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`         | Trusted public keys; must include backend keys                |
+| `SICC_MAX_SKEW_MS`                | `30000`      | Maximum secure-message timestamp skew                         |
 
 ---
 
@@ -120,19 +146,56 @@ python scripts/agents.py start agent-alpha env/agents/.env.alpha agent-beta env/
 The agent name is arbitrary — any string matching `[a-zA-Z0-9][a-zA-Z0-9_.-]+` is valid.
 
 When `SECURE_MODE=true`, each agent needs a private per-agent env file with its own
-identity and Ed25519 key:
+identity, Ed25519 key, and enrollment token. Start the agent with that file:
+
+```bash
+cp env/agents/.env.agent-name.example env/agents/.env.agent-alpha
+python scripts/agents.py start agent-alpha env/agents/.env.agent-alpha
+```
+
+The private per-agent file contains:
 
 ```env
+AGENT_ENROLLMENT_TOKEN=...
 SICC_SERVICE_IDENTITY=agent-alpha
 SICC_SERVICE_KEY_ID=...
 SICC_SERVICE_PRIVATE_KEY_B64=...
+SICC_SERVICE_PUBLIC_KEY_B64=...
 ```
+
+`SICC_SERVICE_IDENTITY` must match the agent name passed to `scripts/agents.py start`.
+For example, use `SICC_SERVICE_IDENTITY=alpha` when starting `alpha`.
+
+The shared `env/.env.agent` file must contain the IoT server trust material used by
+all agents:
+
+```env
+SICC_TRUSTED_PUBLIC_KEYS_JSON={"<iot-server-key-id>":"<iot-server-public-key-b64>"}
+SICC_IOT_SERVER_KEY_ID=<iot-server-key-id>
+```
+
+`SICC_IOT_SERVER_KEY_ID` is always required in secure mode. It is not inferred from
+`SICC_TRUSTED_PUBLIC_KEYS_JSON`.
 
 Generate these values with:
 
 ```bash
 python scripts/generate-security-key.py
 ```
+
+Generate the server enrollment secret with:
+
+```bash
+python scripts/generate-agent-token.py secret
+```
+
+Store `SICC_AGENT_ENROLLMENT_SECRET` in `env/.env.server-iot`. Then generate a signed token for each agent with that secret:
+
+```bash
+python scripts/generate-agent-token.py token agent-alpha --secret "..."
+```
+
+Store `AGENT_ENROLLMENT_TOKEN` only in the matching agent's private env file. On first registration the agent submits its public key and signed token over `/agent/register`. The IoT server verifies that the token signature is valid for that agent name, stores the public key, and all later agent traffic uses secure transport pinned to that public key.
 
 On first run, the agent container is created. On subsequent runs of the same name, the existing stopped container is resumed.
 
