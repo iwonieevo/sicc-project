@@ -24,7 +24,6 @@ from .errors import (
     StaleMessageError,
 )
 from .replay import DirectionState, SessionReplayState
-from .settings import SecureTransportSettings, load_secure_transport_settings
 from .service_handshake import (
     ROLE_AGENT_IOT,
     ROLE_BACKEND_IOT,
@@ -36,11 +35,13 @@ from .service_handshake import (
     create_handshake_start,
     create_server_authenticated_handshake,
     create_server_handshake,
+    decode_handshake_field,
     new_session_id,
     now_ms,
     verify_client_handshake_signature,
 )
 from .session_store import SecureSession, SecureSessionStore
+from .settings import SecureTransportSettings, load_secure_transport_settings
 
 __all__ = [
     "AlgorithmSuite",
@@ -70,6 +71,7 @@ __all__ = [
     "create_handshake_start",
     "create_server_authenticated_handshake",
     "create_server_handshake",
+    "decode_handshake_field",
     "decrypt_envelope",
     "derive_session_keys",
     "ed25519_public_key_from_private_key",

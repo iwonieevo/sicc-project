@@ -27,6 +27,7 @@ from security import (
     SecureTransportSettings,
     ServerHandshake,
     create_server_handshake,
+    decode_handshake_field,
     decrypt_envelope,
     encrypt_envelope,
     load_secure_transport_settings,
@@ -150,7 +151,9 @@ def start_backend_iot_handshake(request: BackendIotHandshakeStartRequest):
     """Accept the backend's start message and return the signed server transcript."""
 
     try:
-        client_ephemeral_pubkey = _decode_b64_field(request.client_ephemeral_pubkey)
+        client_ephemeral_pubkey = decode_handshake_field(
+            request.client_ephemeral_pubkey
+        )
         start = HandshakeStart(
             role=request.role,
             session_id=request.session_id,
@@ -201,7 +204,7 @@ def finish_backend_iot_handshake(request: BackendIotHandshakeFinishRequest):
         raise HTTPException(status_code=404, detail="handshake not found")
 
     try:
-        client_signature = _decode_b64_field(request.client_signature)
+        client_signature = decode_handshake_field(request.client_signature)
         verify_client_handshake_signature(
             settings,
             handshake.transcript,
@@ -277,7 +280,9 @@ def start_agent_iot_handshake(
     """Accept an agent start message and verify its registered device key."""
 
     try:
-        client_ephemeral_pubkey = _decode_b64_field(request.client_ephemeral_pubkey)
+        client_ephemeral_pubkey = decode_handshake_field(
+            request.client_ephemeral_pubkey
+        )
         start = HandshakeStart(
             role=request.role,
             session_id=request.session_id,
@@ -335,7 +340,7 @@ def finish_agent_iot_handshake(request: AgentIotHandshakeFinishRequest):
         raise HTTPException(status_code=404, detail="handshake not found")
 
     try:
-        client_signature = _decode_b64_field(request.client_signature)
+        client_signature = decode_handshake_field(request.client_signature)
         verify_client_handshake_signature(
             pending.verifier_settings,
             pending.handshake.transcript,
@@ -412,13 +417,6 @@ def _raise_handshake_error(exc: Exception) -> None:
         LOGGER.warning("Secure transport failed: %s", exc)
         raise HTTPException(status_code=400, detail="secure transport failed") from exc
     raise exc
-
-
-def _decode_b64_field(value: str) -> bytes:
-    try:
-        return b64decode(value)
-    except Exception as exc:
-        raise ValueError("invalid handshake base64 field") from exc
 
 
 def _settings_trusting_registered_device(

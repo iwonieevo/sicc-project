@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from base64 import b64decode
 from dataclasses import dataclass
 
 from .crypto import (
@@ -262,6 +263,13 @@ def verify_client_handshake_signature(
 
     client_public_key = settings.trusted_public_key(transcript.client_key_id)
     verify_transcript_signature(client_public_key, transcript, client_signature)
+
+
+def decode_handshake_field(value: str) -> bytes:
+    try:
+        return b64decode(value)
+    except Exception as exc:
+        raise ValueError("invalid handshake base64 field") from exc
 
 
 def _validate_start(

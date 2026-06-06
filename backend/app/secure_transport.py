@@ -15,11 +15,12 @@ from security import (
     SecureSessionStore,
     complete_client_handshake,
     create_handshake_start,
+    decode_handshake_field,
     decrypt_envelope,
     encrypt_envelope,
     load_secure_transport_settings,
 )
-from security.encoding import b64decode, b64encode
+from security.encoding import b64encode
 
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
 IOT_SERVER_IDENTITY = os.getenv("SICC_IOT_SERVER_IDENTITY")
@@ -71,8 +72,10 @@ def initiate_backend_iot_handshake(client: httpx.Client | None = None) -> Secure
         data = start_response.json()
         _validate_start_response(start, data)
 
-        server_signature = _decode_b64_field(data["server_signature"])
-        server_ephemeral_pubkey = _decode_b64_field(data["server_ephemeral_pubkey"])
+        server_signature = decode_handshake_field(data["server_signature"])
+        server_ephemeral_pubkey = decode_handshake_field(
+            data["server_ephemeral_pubkey"]
+        )
         client_handshake = complete_client_handshake(
             settings,
             start,
@@ -250,10 +253,3 @@ def _validate_start_response(start: HandshakeStart, data: dict[str, Any]) -> Non
     for field, value in expected.items():
         if data.get(field) != value:
             raise ValueError(f"handshake response field mismatch: {field}")
-
-
-def _decode_b64_field(value: str) -> bytes:
-    try:
-        return b64decode(value)
-    except Exception as exc:
-        raise ValueError("invalid handshake base64 field") from exc

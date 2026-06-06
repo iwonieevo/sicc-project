@@ -19,6 +19,7 @@ from security import (
     SecureSessionStore,
     complete_client_handshake,
     create_handshake_start,
+    decode_handshake_field,
     decrypt_envelope,
     ed25519_public_key_from_private_key,
     encrypt_envelope,
@@ -252,10 +253,10 @@ class SecureAgentTransport:
             self.settings,
             start,
             client_ephemeral,
-            server_ephemeral_pubkey=self._decode_b64_field(
+            server_ephemeral_pubkey=decode_handshake_field(
                 data["server_ephemeral_pubkey"]
             ),
-            server_signature=self._decode_b64_field(data["server_signature"]),
+            server_signature=decode_handshake_field(data["server_signature"]),
         )
 
         finish_response = self.client.post(
@@ -319,12 +320,6 @@ class SecureAgentTransport:
         for field, value in expected.items():
             if data.get(field) != value:
                 raise ValueError(f"handshake response field mismatch: {field}")
-
-    def _decode_b64_field(self, value: str) -> bytes:
-        try:
-            return b64decode(value)
-        except Exception as exc:
-            raise ValueError("invalid handshake base64 field") from exc
 
     def _load_settings(self, agent_name: str):
         source = dict(os.environ)

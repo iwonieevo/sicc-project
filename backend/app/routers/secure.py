@@ -6,6 +6,7 @@ from app.auth import get_current_user
 from app.secure_transport import initiate_backend_iot_handshake, settings
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
 from security import (
     ROLE_FRONTEND_BACKEND,
     CryptoError,
@@ -15,11 +16,12 @@ from security import (
     SecureSession,
     SecureSessionStore,
     create_server_authenticated_handshake,
+    decode_handshake_field,
     decrypt_envelope,
     ed25519_public_key_from_private_key,
     encrypt_envelope,
 )
-from security.encoding import b64decode, b64encode
+from security.encoding import b64encode
 
 LOGGER = logging.getLogger(__name__)
 
@@ -102,15 +104,15 @@ def create_backend_iot_handshake(_current_user: dict = Depends(get_current_user)
     )
 
 
-@router.get(
-    "/frontend-backend/config", response_model=FrontendBackendConfigResponse
-)
+@router.get("/frontend-backend/config", response_model=FrontendBackendConfigResponse)
 def get_frontend_backend_config():
     """Expose backend identity metadata needed by the browser secure client."""
 
     public_key = None
     if settings.private_key is not None:
-        public_key = b64encode(ed25519_public_key_from_private_key(settings.private_key))
+        public_key = b64encode(
+            ed25519_public_key_from_private_key(settings.private_key)
+        )
 
     return FrontendBackendConfigResponse(
         secure_mode=settings.enabled,
@@ -132,7 +134,9 @@ def start_frontend_backend_handshake(request: FrontendBackendHandshakeStartReque
     """Start a server-authenticated encrypted session for a browser client."""
 
     try:
-        client_ephemeral_pubkey = _decode_b64_field(request.client_ephemeral_pubkey)
+        client_ephemeral_pubkey = decode_handshake_field(
+            request.client_ephemeral_pubkey
+        )
         start = HandshakeStart(
             role=request.role,
             session_id=request.session_id,
@@ -268,13 +272,6 @@ def _dispatch_frontend_plaintext_request(body: dict[str, Any]) -> dict[str, Any]
         "status_code": response.status_code,
         "body": response_body,
     }
-
-
-def _decode_b64_field(value: str) -> bytes:
-    try:
-        return b64decode(value)
-    except Exception as exc:
-        raise ValueError("invalid handshake base64 field") from exc
 
 
 def _raise_secure_transport_error(exc: Exception) -> None:
