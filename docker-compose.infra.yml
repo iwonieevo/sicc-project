@@ -48,6 +48,15 @@ services:
       - public
       - internal
 
+  valkey:
+    image: valkey/valkey:9.1.0
+    ports:
+      - "${VALKEY_EXPOSED_PORT:-6379}:6379"
+    volumes:
+      - valkey_data:/data
+    networks:
+      - internal
+
   iot-server:
     build:
       context: .
@@ -72,9 +81,12 @@ services:
       - DB_USER=iot_server
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
+      - SICC_VALKEY_URL=redis://valkey:6379/0
     depends_on:
       db:
         condition: service_healthy
+      valkey:
+        condition: service_started
     networks:
       - internal
       - agent-net
@@ -120,3 +132,4 @@ networks:
 
 volumes:
   postgres_data:
+  valkey_data:
