@@ -18,7 +18,6 @@ import { b64decode, b64encode } from "./encoding";
 
 const CLIENT_IDENTITY = "browser";
 const CLIENT_KEY_ID = "anonymous";
-const TOFU_STORAGE_KEY = "sicc.backendPublicKey";
 
 interface SecureConfig {
   secure_mode: boolean;
@@ -236,44 +235,24 @@ function selectTrustedServerPublicKey(config: SecureConfig): Uint8Array {
   const pinnedKeyId = import.meta.env.VITE_SICC_BACKEND_KEY_ID as string | undefined;
   const pinnedIdentity = import.meta.env.VITE_SICC_BACKEND_IDENTITY as string | undefined;
 
-  if (pinnedIdentity && pinnedIdentity !== config.server_identity) {
+  if (!pinnedIdentity || !pinnedKeyId || !pinnedKey) {
+    throw new Error("pinned backend secure identity is not configured");
+  }
+  if (pinnedIdentity !== config.server_identity) {
     throw new Error("pinned backend identity mismatch");
   }
-  if (pinnedKeyId && pinnedKeyId !== config.server_key_id) {
+  if (pinnedKeyId !== config.server_key_id) {
     throw new Error("pinned backend key id mismatch");
   }
-  if (pinnedKey) {
-    const key = b64decode(pinnedKey);
-    if (publicKeyId(key) !== config.server_key_id) {
-      throw new Error("pinned backend public key id mismatch");
-    }
-    return key;
+  if (pinnedKey !== config.server_public_key) {
+    throw new Error("pinned backend public key mismatch");
   }
 
-  if (!config.tofu_allowed || !config.server_public_key) {
-    throw new Error("backend public key is not pinned and TOFU is disabled");
+  const key = b64decode(pinnedKey);
+  if (publicKeyId(key) !== config.server_key_id) {
+    throw new Error("pinned backend public key id mismatch");
   }
-
-  const offered = {
-    identity: config.server_identity,
-    key_id: config.server_key_id,
-    public_key: config.server_public_key,
-  };
-  const stored = localStorage.getItem(TOFU_STORAGE_KEY);
-  if (!stored) {
-    localStorage.setItem(TOFU_STORAGE_KEY, JSON.stringify(offered));
-    return b64decode(config.server_public_key);
-  }
-
-  const trusted = JSON.parse(stored);
-  if (
-    trusted.identity !== offered.identity ||
-    trusted.key_id !== offered.key_id ||
-    trusted.public_key !== offered.public_key
-  ) {
-    throw new Error("backend TOFU public key changed");
-  }
-  return b64decode(trusted.public_key);
+  return key;
 }
 
 function validateHandshakeEcho(
