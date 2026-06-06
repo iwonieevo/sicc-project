@@ -90,6 +90,12 @@ def load_agent_env_file(path: str | None) -> dict:
     return env
 
 
+def load_base_env() -> dict:
+    env = load_dotenv(".env")
+    env.update(os.environ)
+    return env
+
+
 def parse_bool(value: str) -> bool:
     normalized = value.strip().lower()
     if normalized in {"1", "true", "yes", "on"}:
@@ -159,10 +165,12 @@ def build_generated_agent_env(
 
 
 def prepare_agent_env(agent_name: str, env_path: str | None) -> dict[str, str]:
+    base_env = load_base_env()
     agent_env = load_agent_env_file(env_path)
     agent_env["AGENT_NAME"] = agent_name
+    agent_env["SECURE_MODE"] = base_env.get("SECURE_MODE", "false")
 
-    if parse_bool(load_dotenv().get("SECURE_MODE", "false")):
+    if parse_bool(agent_env["SECURE_MODE"]):
         generated_env = build_generated_agent_env(agent_name)
         agent_env.update(generated_env)
 
