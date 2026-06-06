@@ -11,7 +11,6 @@ services:
     image: sicc-agent:latest
     container_name: ${AGENT_NAME}
     env_file:
-      - .env
       - env/.env.agent
     environment:
       - IOT_SERVER_URL=http://iot-server:7000
@@ -21,9 +20,10 @@ services:
       - SICC_SERVICE_KEY_ID=${SICC_SERVICE_KEY_ID:-}
       - SICC_SERVICE_PRIVATE_KEY_B64=${SICC_SERVICE_PRIVATE_KEY_B64:-}
       - SICC_TRUSTED_PUBLIC_KEYS_JSON=${SICC_TRUSTED_PUBLIC_KEYS_JSON:-{}}
-      - SICC_IOT_SERVER_IDENTITY=${SICC_IOT_SERVER_IDENTITY}
+      - SICC_IOT_SERVER_IDENTITY=${SICC_IOT_SERVER_IDENTITY:-iot-server}
       - SICC_IOT_SERVER_KEY_ID=${SICC_IOT_SERVER_KEY_ID:-}
       - SICC_MAX_SKEW_MS=${SICC_MAX_SKEW_MS:-30000}
+      - SECURE_MODE=${SECURE_MODE:-false}
     volumes:
       - ./security:/app/security:ro
     networks:
