@@ -18,6 +18,7 @@ from .settings import SecureTransportSettings
 
 ROLE_BACKEND_IOT = "backend-iot"
 ROLE_AGENT_IOT = "agent-iot"
+ROLE_FRONTEND_BACKEND = "frontend-backend"
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,61 @@ def create_server_handshake(
         expected_server_identity=expected_server_identity,
         timestamp_ms=timestamp_ms,
     )
+
+    server_ephemeral = generate_x25519_keypair()
+    transcript = HandshakeTranscript(
+        protocol_version=settings.protocol_version,
+        role=start.role,
+        algorithm_suite=settings.algorithm_suite,
+        session_id=start.session_id,
+        client_identity=start.client_identity,
+        server_identity=start.server_identity,
+        client_key_id=start.client_key_id,
+        server_key_id=start.server_key_id,
+        server_ephemeral_pubkey=server_ephemeral.public_key,
+        client_ephemeral_pubkey=start.client_ephemeral_pubkey,
+        timestamp_ms=start.timestamp_ms,
+    )
+
+    assert settings.private_key is not None
+    signature = sign_transcript(settings.private_key, transcript)
+    keys = derive_session_keys(
+        server_ephemeral.private_key,
+        start.client_ephemeral_pubkey,
+        transcript,
+    )
+    return ServerHandshake(
+        transcript=transcript,
+        server_ephemeral=server_ephemeral,
+        server_signature=signature,
+        keys=keys,
+    )
+
+
+def create_server_authenticated_handshake(
+    settings: SecureTransportSettings,
+    start: HandshakeStart,
+    *,
+    expected_role: str,
+    expected_server_identity: str,
+    timestamp_ms: int | None = None,
+) -> ServerHandshake:
+    """Create a server-authenticated session for anonymous browser clients.
+
+    Unlike service/agent handshakes, this does not require a registered client
+    Ed25519 key. The backend signs the transcript, and application-level auth happens
+    inside the encrypted channel.
+    """
+
+    _require_enabled(settings)
+
+    if start.role != expected_role:
+        raise ValueError("unexpected handshake role")
+    if start.server_identity != expected_server_identity:
+        raise ValueError("unexpected server identity")
+    if start.server_key_id != settings.key_id:
+        raise ValueError("unexpected server key id")
+    _validate_timestamp(start.timestamp_ms, settings.max_skew_ms, timestamp_ms)
 
     server_ephemeral = generate_x25519_keypair()
     transcript = HandshakeTranscript(

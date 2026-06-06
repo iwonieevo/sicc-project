@@ -4,14 +4,20 @@ import pytest
 
 from security import (
     ROLE_BACKEND_IOT,
+    ROLE_FRONTEND_BACKEND,
+    HandshakeStart,
     SignatureVerificationError,
     StaleMessageError,
     complete_client_handshake,
     create_handshake_start,
+    create_server_authenticated_handshake,
     create_server_handshake,
+    derive_session_keys,
     generate_ed25519_keypair,
+    generate_x25519_keypair,
     load_secure_transport_settings,
     public_key_id,
+    verify_transcript_signature,
     verify_client_handshake_signature,
 )
 from security.encoding import b64encode
@@ -145,3 +151,50 @@ def test_create_handshake_start_requires_secure_mode():
             server_identity="iot-server",
             server_key_id="missing",
         )
+
+
+def test_frontend_backend_server_authenticated_handshake_allows_anonymous_client():
+    backend_key = generate_ed25519_keypair()
+    backend_key_id = public_key_id(backend_key.public_key)
+    backend = load_secure_transport_settings(
+        default_identity="backend",
+        env={
+            "SECURE_MODE": "true",
+            "SICC_SERVICE_IDENTITY": "backend",
+            "SICC_SERVICE_KEY_ID": backend_key_id,
+            "SICC_SERVICE_PRIVATE_KEY_B64": b64encode(backend_key.private_key),
+            "SICC_TRUSTED_PUBLIC_KEYS_JSON": "{}",
+        },
+    )
+    browser_ephemeral = generate_x25519_keypair()
+    start = HandshakeStart(
+        role=ROLE_FRONTEND_BACKEND,
+        session_id="browser-session",
+        client_identity="browser",
+        server_identity="backend",
+        client_key_id="anonymous",
+        server_key_id=backend_key_id,
+        client_ephemeral_pubkey=browser_ephemeral.public_key,
+        timestamp_ms=1_800_000_000_000,
+    )
+
+    server = create_server_authenticated_handshake(
+        backend,
+        start,
+        expected_role=ROLE_FRONTEND_BACKEND,
+        expected_server_identity="backend",
+        timestamp_ms=1_800_000_000_001,
+    )
+    client_keys = derive_session_keys(
+        browser_ephemeral.private_key,
+        server.transcript.server_ephemeral_pubkey,
+        server.transcript,
+    )
+
+    verify_transcript_signature(
+        backend_key.public_key,
+        server.transcript,
+        server.server_signature,
+    )
+    assert server.transcript.client_key_id == "anonymous"
+    assert client_keys == server.keys
