@@ -6,3 +6,4 @@ pydantic-settings==2.7.1
 psycopg2-binary==2.9.10
 cryptography==48.0.0
 httpx==0.28.1
+valkey==6.1.1

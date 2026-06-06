@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from app.agent_security import INTERNAL_AGENT_TOKEN_HEADER, require_agent_transport
 from app.agent_security import settings as secure_settings
 from app.database import get_db
-from app.enrollment import verify_enrollment_token
+from app.enrollment import consume_enrollment_jti, verify_enrollment_token
 from app.models import (
     Command,
     CommandExecution,
@@ -29,6 +29,52 @@ from security.encoding import b64decode
 
 router = APIRouter()
 LOGGER = logging.getLogger(__name__)
+
+
+def require_valid_enrollment_token(token: str | None, agent_name: str) -> None:
+    enrollment_secret = os.getenv("SICC_AGENT_ENROLLMENT_SECRET")
+    if enrollment_secret is None:
+        LOGGER.warning("Secure registration rejected without enrollment secret")
+        raise HTTPException(
+            status_code=500, detail="Agent enrollment is not configured"
+        )
+
+    if token is None:
+        LOGGER.warning(
+            "Secure registration rejected without enrollment token: '%s'",
+            agent_name,
+        )
+        raise HTTPException(
+            status_code=403, detail="Device enrollment token is invalid"
+        )
+
+    claims = verify_enrollment_token(enrollment_secret, token, agent_name)
+    if claims is None:
+        LOGGER.warning(
+            "Secure registration rejected for invalid enrollment token: '%s'",
+            agent_name,
+        )
+        raise HTTPException(
+            status_code=403, detail="Device enrollment token is invalid"
+        )
+
+    try:
+        consumed = consume_enrollment_jti(claims)
+    except RuntimeError:
+        LOGGER.warning(
+            "Secure registration rejected because enrollment state is unavailable: '%s'",
+            agent_name,
+        )
+        raise HTTPException(status_code=503, detail="Agent enrollment is unavailable")
+
+    if not consumed:
+        LOGGER.warning(
+            "Secure registration rejected for reused enrollment token: '%s'",
+            agent_name,
+        )
+        raise HTTPException(
+            status_code=403, detail="Device enrollment token is invalid"
+        )
 
 
 def validate_device_public_key(
@@ -75,6 +121,13 @@ def register_agent(
     )
     device = db.query(Device).filter(Device.name == data.name).first()
 
+    if device and device.is_deleted:
+        LOGGER.warning(
+            f"Registration attempt rejected for deleted device: '{data.name}'"
+        )
+        raise HTTPException(status_code=400, detail="Device has been deleted")
+
+    allow_key_replacement = False
     if secure_settings.enabled:
         if public_key_id_value is None or public_key_value is None:
             LOGGER.warning(
@@ -83,42 +136,19 @@ def register_agent(
             )
             raise HTTPException(status_code=403, detail="Device public key is required")
 
-        if device is None or (
+        needs_enrollment = device is None or (
             device.public_key_id is None and device.public_key is None
-        ):
-            enrollment_secret = os.getenv("SICC_AGENT_ENROLLMENT_SECRET")
-            if enrollment_secret is None:
-                LOGGER.warning("Secure registration rejected without enrollment secret")
-                raise HTTPException(
-                    status_code=500, detail="Agent enrollment is not configured"
-                )
-            if data.enrollment_token is None or not verify_enrollment_token(
-                enrollment_secret, data.enrollment_token, data.name
-            ):
-                LOGGER.warning(
-                    "Secure registration rejected for invalid enrollment token: '%s'",
-                    data.name,
-                )
-                raise HTTPException(
-                    status_code=403, detail="Device enrollment token is invalid"
-                )
-        elif (
+        )
+        is_key_rotation = device is not None and (
             device.public_key_id != public_key_id_value
             or device.public_key != public_key_value
-        ):
-            LOGGER.warning(
-                "Secure registration rejected for device key mismatch: '%s'",
-                device.name,
-            )
-            raise HTTPException(status_code=403, detail="Device public key mismatch")
+        )
+
+        if needs_enrollment or is_key_rotation:
+            require_valid_enrollment_token(data.enrollment_token, data.name)
+            allow_key_replacement = is_key_rotation
 
     if device:
-        if device.is_deleted:
-            LOGGER.warning(
-                f"Registration attempt rejected for deleted device: '{data.name}'"
-            )
-            raise HTTPException(status_code=400, detail="Device has been deleted")
-
         if public_key_id_value is not None:
             if device.public_key_id is None and device.public_key is None:
                 device.public_key_id = public_key_id_value
@@ -127,12 +157,15 @@ def register_agent(
                 device.public_key_id != public_key_id_value
                 or device.public_key != public_key_value
             ):
-                LOGGER.warning(
-                    f"Registration attempt rejected for device key mismatch: '{data.name}'"
-                )
-                raise HTTPException(
-                    status_code=400, detail="Device public key mismatch"
-                )
+                if not allow_key_replacement:
+                    LOGGER.warning(
+                        f"Registration attempt rejected for device key mismatch: '{data.name}'"
+                    )
+                    raise HTTPException(
+                        status_code=400, detail="Device public key mismatch"
+                    )
+                device.public_key_id = public_key_id_value
+                device.public_key = public_key_value
 
         device.status = "online"
         device.last_seen = datetime.now(timezone.utc)
