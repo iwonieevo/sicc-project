@@ -37,8 +37,11 @@ dist/
 downloads/
 eggs/
 .eggs/
+# xd
 lib/
 lib64/
+!frontend/app/lib/
+!frontend/app/lib/secure
 parts/
 sdist/
 var/
