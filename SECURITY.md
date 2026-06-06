@@ -70,6 +70,8 @@ Each service in the system has its own long-term Ed25519 keypair generated prior
 
 During the handshake, the server-role party signs the full handshake transcript (defined above) with its long-term Ed25519 private key. The client receives the server's ephemeral public key alongside this signature and can independently verify it against the known public key for that service identity (`server_key_id` from the transcript). A failed signature verification indicates a likely MitM attack and the connection must be dropped immediately.
 
+For browser-to-backend traffic, the frontend uses a server-authenticated ECDHE variant. The browser generates only an ephemeral X25519 key for the current in-memory transport session instaed of keeping a registered long-term Ed25519 identity. The backend signs the transcript with its long-term Ed25519 key, the browser verifies that signature using the pinned or TOFU backend public key, and normal user authentication happens inside the encrypted transport.
+
 ## Trust On First Use (TOFU)
 
 Because the initial delivery of the frontend application (and its bundled server public key) occurs over plain HTTP, it is inherently vulnerable on first load. An attacker capable of intercepting that first request could substitute both the JavaScript bundle and the embedded public key before the crypto layer has any chance to run.
