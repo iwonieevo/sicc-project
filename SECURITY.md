@@ -77,9 +77,7 @@ This is a known and accepted limitation of the threat model. We mitigate it by a
 
 ## Raspberry Pi Identity Verification
 
-Each RPi has its own Ed25519 keypair generated prior to deployment. The private key is stored in the RPi's `.env`.
-
-Initial secure-mode registration is bootstrapped with a signed per-agent enrollment token. The IoT server stores `SICC_AGENT_ENROLLMENT_SECRET` in its private `.env`, and each RPi stores an `AGENT_ENROLLMENT_TOKEN` signed by that secret for its exact agent name. On first registration, `/agent/register` is intentionally not sent through the secure transport because the device public key is not trusted yet. Instead, the RPi submits its name, public key, public key id, and enrollment token. The IoT server verifies the HMAC signature with a constant-time comparison, checks that the token is valid for the submitted agent name, stores the submitted public key, and marks the device online.
+Each RPi agent has their own enrollment token, service identity, and a pair of Ed25519 keys for secure transport. The enrollment token, composed of a payload that contains: a version, an issuer, an agent_id, an unique jti, an 'issued at' timestamp and an expiry timestamp, and the signature of that payload created with the enrollment secret. While possible to launch and register an agent, the `scripts/agents.py` provides a convenient wrapper around the enrollment token generation, key generation and agent registration process.
 
 After registration, the corresponding public key is registered in the device registry. On each secure session initiation, the RPi signs the full handshake transcript (mirroring the frontend<->backend handshake, with `role` set accordingly) with its long-term Ed25519 private key. Any device whose public key is not in the shared device registry is rejected outright.
 
