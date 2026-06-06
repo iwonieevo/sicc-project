@@ -84,22 +84,8 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ## TLS Certificates
 
-OpenSSL must be available on your PATH. On Linux/macOS:
-
 ```bash
-sh scripts/generate-db-certs.sh
-```
-
-On Windows with Git Bash (recommended, bundles OpenSSL):
-
-```bash
-MSYS_NO_PATHCONV=1 sh scripts/generate-db-certs.sh
-```
-
-Or with PowerShell if OpenSSL is on your PATH:
-
-```powershell
-.\scripts\generate-db-certs.ps1
+python scripts/generator.py db-certs
 ```
 
 This creates a local CA and a PostgreSQL server certificate under `db/certs/`. The script refuses to overwrite existing certificates - delete the files in `db/certs/` first if you need to regenerate them.
