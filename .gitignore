@@ -2,6 +2,9 @@
 .env
 env/*
 !env/.env*.example
+!env/agents/
+env/agents/*
+!env/agents/.env.agent-name.example
 db/certs/
 
 # OS
@@ -34,8 +37,11 @@ dist/
 downloads/
 eggs/
 .eggs/
+# xd
 lib/
 lib64/
+!frontend/app/lib/
+!frontend/app/lib/secure
 parts/
 sdist/
 var/

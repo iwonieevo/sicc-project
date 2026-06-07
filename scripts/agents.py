@@ -1,10 +1,24 @@
 import argparse
+import hashlib
+import hmac
+import json
 import os
+import secrets
 import subprocess
 import sys
+from pathlib import Path
+from time import time
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "server-iot"))
+
+from security import generate_ed25519_keypair, public_key_id  # noqa: E402
+from security.encoding import b64encode  # noqa: E402
 
 COMPOSE_FILE = "docker-compose.agents.yml"
 COMPOSE_PROJECT = "agents"
+ENROLLMENT_TTL_SECONDS = 120
 
 
 def load_dotenv(path=".env") -> dict:
@@ -33,8 +47,145 @@ def run_cmd(cmd: list[str], env_extra: dict | None = None) -> int:
     return subprocess.run(cmd, env=env).returncode
 
 
+def looks_like_env_path(value: str) -> bool:
+    path = Path(value)
+    return (
+        "/" in value
+        or "\\" in value
+        or value.endswith(".env")
+        or value.startswith(".env")
+        or path.exists()
+    )
+
+
+def parse_start_specs(items: list[str]) -> list[tuple[str, str | None]]:
+    specs = []
+    index = 0
+    while index < len(items):
+        name = items[index]
+        if looks_like_env_path(name):
+            raise SystemExit(f"Expected agent name, got env path: {name}")
+
+        env_path = None
+        next_index = index + 1
+        if next_index < len(items) and looks_like_env_path(items[next_index]):
+            env_path = items[next_index]
+            index += 2
+        else:
+            index += 1
+
+        specs.append((name, env_path))
+    return specs
+
+
+def load_agent_env_file(path: str | None) -> dict:
+    env = load_dotenv("env/.env.agent")
+    if path is None:
+        return env
+
+    resolved = Path(path)
+    if not resolved.is_file():
+        raise SystemExit(f"Agent env file not found: {path}")
+    env.update(load_dotenv(str(resolved)))
+    return env
+
+
+def load_base_env() -> dict:
+    env = load_dotenv(".env")
+    env.update(os.environ)
+    return env
+
+
+def parse_bool(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off", ""}:
+        return False
+    raise SystemExit(f"Invalid SECURE_MODE value: {value}")
+
+
+def load_enrollment_secret() -> str:
+    secret = os.environ.get("SICC_AGENT_ENROLLMENT_SECRET") or load_dotenv(
+        "env/.env.server-iot"
+    ).get("SICC_AGENT_ENROLLMENT_SECRET")
+    if not secret:
+        raise SystemExit(
+            "SICC_AGENT_ENROLLMENT_SECRET is required in the environment or env/.env.server-iot"
+        )
+    return secret
+
+
+def create_enrollment_token(
+    secret: str,
+    agent_name: str,
+    ttl_seconds: int = ENROLLMENT_TTL_SECONDS,
+) -> str:
+    issued_at = int(time())
+    expires_at = issued_at + ttl_seconds
+    if expires_at <= issued_at:
+        raise ValueError("time is broken")
+
+    payload = {
+        "v": 1,
+        "iss": "agents.py",
+        "agent_id": agent_name,
+        "jti": secrets.token_urlsafe(32),
+        "iat": issued_at,
+        "exp": expires_at,
+    }
+
+    payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    payload_part = b64encode(payload_bytes)
+    signature = hmac.new(
+        secret.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256
+    ).digest()
+    return f"{payload_part}.{b64encode(signature)}"
+
+
+def build_generated_agent_env(
+    agent_name: str,
+) -> dict[str, str]:
+    keypair = generate_ed25519_keypair()
+    token = create_enrollment_token(
+        load_enrollment_secret(),
+        agent_name,
+        ttl_seconds=ENROLLMENT_TTL_SECONDS,
+    )
+    return {
+        "AGENT_ENROLLMENT_TOKEN": token,
+        "AGENT_NAME": agent_name,
+        "SICC_SERVICE_IDENTITY": agent_name,
+        "SICC_SERVICE_KEY_ID": public_key_id(keypair.public_key),
+        "SICC_SERVICE_PRIVATE_KEY_B64": b64encode(keypair.private_key),
+        "SICC_SERVICE_PUBLIC_KEY_B64": b64encode(keypair.public_key),
+    }
+
+
+def prepare_agent_env(agent_name: str, env_path: str | None) -> dict[str, str]:
+    base_env = load_base_env()
+    agent_env = load_agent_env_file(env_path)
+    agent_env["AGENT_NAME"] = agent_name
+    agent_env["SECURE_MODE"] = base_env.get("SECURE_MODE", "false")
+
+    if parse_bool(agent_env["SECURE_MODE"]):
+        generated_env = build_generated_agent_env(agent_name)
+        agent_env.update(generated_env)
+
+    return agent_env
+
+
 def get_agent_names(running_only=False) -> list[str]:
-    cmd = ["docker", "ps", "--filter", f"label={get_agent_label()}", "--format", "{{.Names}}"]
+    cmd = [
+        "docker",
+        "ps",
+        "--filter",
+        f"label={get_agent_label()}",
+        "--format",
+        "{{.Names}}",
+    ]
     if not running_only:
         cmd.insert(2, "-a")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -45,21 +196,39 @@ def get_agent_names(running_only=False) -> list[str]:
 
 
 def cmd_start(args):
-    for name in args.names:
+    for name, env_path in parse_start_specs(args.items):
         existing = subprocess.run(
             ["docker", "ps", "-a", "-q", "--filter", f"name=^/{name}$"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         ).stdout.strip()
 
         if existing:
+            if env_path:
+                print(
+                    f"Env file ignored for existing container {name}; remove it first to change env.",
+                    file=sys.stderr,
+                )
             print(f"Resuming: {name}")
             code = run_cmd(["docker", "start", name])
         else:
-            print(f"Starting: {name}")
+            print(f"Starting: {name}" + (f" ({env_path})" if env_path else ""))
+            agent_env = prepare_agent_env(name, env_path)
             code = run_cmd(
-                ["docker", "compose", "-f", COMPOSE_FILE, "-p", COMPOSE_PROJECT,
-                 "run", "-d", "--name", name, "agent"],
-                env_extra={"AGENT_NAME": name}
+                [
+                    "docker",
+                    "compose",
+                    "-f",
+                    COMPOSE_FILE,
+                    "-p",
+                    COMPOSE_PROJECT,
+                    "run",
+                    "-d",
+                    "--name",
+                    name,
+                    "agent",
+                ],
+                env_extra=agent_env,
             )
 
         if code != 0:
@@ -71,7 +240,11 @@ def cmd_start(args):
 def cmd_stop(args):
     names = get_agent_names(running_only=True) if args.all else args.names
     if not names:
-        print("No running agents found." if args.all else "Specify at least one agent name.")
+        print(
+            "No running agents found."
+            if args.all
+            else "Specify at least one agent name."
+        )
         return
     for name in names:
         print(f"Stopping: {name}")
@@ -109,7 +282,14 @@ def cmd_list(args):
     label = get_agent_label()
     print("Running agents:")
     run_cmd(
-        ["docker", "ps", "--filter", f"label={label}", "--format", "table {{.Names}}\t{{.Status}}\t{{.ID}}"]
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"label={label}",
+            "--format",
+            "table {{.Names}}\t{{.Status}}\t{{.ID}}",
+        ]
     )
 
     print("\nStopped agents:")
@@ -136,7 +316,12 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("start", help="Start one or more agents")
-    p.add_argument("names", nargs="+", metavar="name")
+    p.add_argument(
+        "items",
+        nargs="+",
+        metavar="name [env_file]",
+        help="Agent names, optionally followed by per-agent env file paths",
+    )
     p.set_defaults(func=cmd_start)
 
     p = sub.add_parser("stop", help="Stop one or more agents (container kept)")

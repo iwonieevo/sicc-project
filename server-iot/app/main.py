@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.database import SessionLocal
 from app.models import Device
-from app.routers import agent, commands, devices, execute
+from app.routers import agent, commands, devices, execute, secure
 from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
@@ -97,6 +97,8 @@ app.include_router(devices.router)
 app.include_router(commands.router)
 app.include_router(agent.router)
 app.include_router(execute.router)
+app.include_router(secure.router)
+app.include_router(secure.agent_iot_router)
 
 
 @app.get("/")

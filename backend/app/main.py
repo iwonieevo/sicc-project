@@ -1,6 +1,6 @@
 import logging
 
-from app.routers import auth, commands
+from app.routers import auth, commands, secure
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,6 +20,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(commands.router)
+app.include_router(secure.router)
 
 
 @app.get("/")

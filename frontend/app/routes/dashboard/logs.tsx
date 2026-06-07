@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Navigate } from "react-router";
 import { useAuth } from "~/providers/AuthProvider";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { formatParameterValue } from "~/lib/utils";
 import { ListPagination } from "~/components/list-pagination";
+import { secureFetch } from "~/lib/secure/secure-fetch";
 
 interface CommandLog {
   queue_id: number;
@@ -14,7 +22,7 @@ interface CommandLog {
   command_id: number;
   command_name: string;
   parameters?: Record<string, any>;
-  status: 'queued' | 'running' | 'done' | 'error';
+  status: "queued" | "running" | "done" | "error";
   result?: string;
   is_error?: boolean;
   queued_at?: string;
@@ -30,30 +38,22 @@ export default function Page() {
 
   const fetchLogs = async (silent = false) => {
     if (!user) return;
-    if (!silent)
-      setLoadingLogs(true);
+    if (!silent) setLoadingLogs(true);
     try {
       const token = localStorage.getItem("accessToken");
       let url = `/api/logs?limit=${limit}`;
       if (limit === -1) {
         url = `/api/logs`;
       }
-      fetch(url, {
+      const res = await secureFetch(url, {
         credentials: "include",
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-        .then(res => res.ok ? res.json() : [])
-        .then(data => {
-          setLogs(data);
-        })
-        .catch(err => {
-          console.error("Failed to fetch logs:", err);
-          // setLogs([]);
-        })
-        .finally(() => setLoadingLogs(false));
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setLogs(res.ok ? await res.json<CommandLog[]>() : []);
     } catch (err) {
       console.error("Error fetching logs:", err);
       // setLogs([]);
+    } finally {
       setLoadingLogs(false);
     }
   };

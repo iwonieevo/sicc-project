@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 
 class RegisterRequest(BaseModel):
     name: str = Field(..., description="Agent hostname or identifier")
+    public_key_id: Optional[str] = None
+    public_key: Optional[str] = None
+    enrollment_token: Optional[str] = None
 
 
 class RegisterResponse(BaseModel):
@@ -32,6 +35,7 @@ class ExecuteResponse(BaseModel):
 class DeviceResponse(BaseModel):
     id: int
     name: str
+    public_key_id: Optional[str] = None
     status: str
     last_seen: Optional[datetime]
 

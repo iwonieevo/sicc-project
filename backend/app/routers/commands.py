@@ -15,7 +15,15 @@ from app.schemas import (
     QueueItemResponse,
     ResultCallbackRequest,
 )
+from app.secure_transport import (
+    forward_secure_backend_iot_request,
+)
+from app.secure_transport import (
+    settings as secure_settings,
+)
 from fastapi import APIRouter, Depends, HTTPException
+
+from security import CryptoError
 
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
 LOGGER = logging.getLogger(__name__)
@@ -32,7 +40,6 @@ def model_to_dict(model):
 
 
 def build_server_url(path: str) -> str:
-
     return f"{IOT_SERVER_URL.rstrip('/')}{path}"
 
 
@@ -41,15 +48,25 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
     Forward a request from the backend to the IoT server.
     Return the server response back to the frontend.
     """
-    url = build_server_url(path)
-
     try:
-        response = client.request(
-            method=method,
-            url=url,
-            json=json_data,
-            params=params,
-        )
+        if secure_settings.enabled:
+            status_code, response_data = forward_secure_backend_iot_request(
+                method=method,
+                path=path,
+                json_data=json_data,
+                params=params,
+            )
+            if status_code >= 400:
+                detail = (
+                    response_data.get("detail", response_data)
+                    if isinstance(response_data, dict)
+                    else response_data
+                )
+                raise HTTPException(status_code=status_code, detail=detail)
+            return response_data
+
+        url = build_server_url(path)
+        response = client.request(method=method, url=url, json=json_data, params=params)
 
         if response.status_code >= 400:
             try:
@@ -79,6 +96,12 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
         raise HTTPException(
             status_code=503,
             detail="IoT server unavailable",
+        )
+    except (CryptoError, ValueError) as e:
+        LOGGER.warning(f"Secure backend-IoT forwarding failed: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="secure transport failed",
         )
 
 
@@ -114,7 +137,9 @@ def execute_command(
     )
 
     if not response_data:
-        raise HTTPException(status_code=502, detail="IoT server did not return a response")
+        raise HTTPException(
+            status_code=502, detail="IoT server did not return a response"
+        )
 
     queue_id = response_data["queue_id"]
 
@@ -221,7 +246,10 @@ def create_command(
 
 
 @router.post("/result")
-def receive_result(request: ResultCallbackRequest):
+def receive_result(
+    request: ResultCallbackRequest,
+    current_user: dict = Depends(get_current_user),
+):
     return forward_to_server(
         method="POST",
         path="/result",
@@ -245,7 +273,9 @@ def get_device_queue(
     )
 
 
-@router.post("/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse)
+@router.post(
+    "/devices/{device_id}/queue/{queue_id}/cancel", response_model=QueueCancelResponse
+)
 def cancel_queue_task(
     device_id: int,
     queue_id: int,

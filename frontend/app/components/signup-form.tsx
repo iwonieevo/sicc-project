@@ -21,6 +21,7 @@ import {
   FieldLabel,
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
+import { secureFetch } from "~/lib/secure/secure-fetch"
 
 const signupSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -49,7 +50,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const onSubmit = async (values: SignupFormValues) => {
     setServerError(null)
     try {
-      const response = await fetch("/api/signup", {
+      const response = await secureFetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -58,7 +59,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
         }),
       })
 
-      const data = await response.json()
+      const data = await response.json<{ detail?: string }>()
 
       if (!response.ok) {
         throw new Error(data.detail || "Failed to create account")

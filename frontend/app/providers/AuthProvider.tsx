@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
+import { clearSecureTransportSession, secureFetch } from "~/lib/secure/secure-fetch";
 
 interface AuthContextType {
   loading: boolean;
@@ -12,7 +13,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   user: null,
   login: () => {},
-  logout: () => {}
+  logout: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -29,30 +30,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    fetch("/api/me", {
+    secureFetch("/api/me", {
       credentials: "include",
-      headers: { "Authorization": `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setUser({ email: data.email }))
+      .then((res) => (res.ok ? res.json<{ email: string }>() : Promise.reject()))
+      .then((data) => setUser({ email: data.email }))
       .catch(() => localStorage.removeItem("accessToken"))
       .finally(() => setLoading(false));
   }, []);
 
-  const value = useMemo(() => ({
-    user,
-    loading,
-    login: (email: string, token: string) => {
-      localStorage.setItem("accessToken", token);
-      setUser({ email });
-      navigate("/dashboard");
-    },
-    logout: () => {
-      localStorage.removeItem("accessToken");
-      setUser(null);
-      navigate("/login", { replace: true });
-    }
-  }), [user, loading, navigate]);
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      login: (email: string, token: string) => {
+        localStorage.setItem("accessToken", token);
+        setUser({ email });
+        navigate("/dashboard");
+      },
+      logout: () => {
+        localStorage.removeItem("accessToken");
+        clearSecureTransportSession();
+        setUser(null);
+        navigate("/login", { replace: true });
+      },
+    }),
+    [user, loading, navigate],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

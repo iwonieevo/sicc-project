@@ -20,6 +20,7 @@ import {
 import { Input } from "~/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectValue, SelectTrigger } from "~/components/ui/select"
 import { Badge } from "../ui/badge"
+import { secureFetch } from "~/lib/secure/secure-fetch"
 
 interface Device {
     id: number
@@ -79,18 +80,18 @@ export function CommandExecutionForm({
             try {
                 const token = localStorage.getItem("accessToken");
                 const [devicesRes, commandsRes] = await Promise.all([
-                    fetch('/api/devices', {
+                    secureFetch('/api/devices', {
                         credentials: "include",
                         headers: { "Authorization": `Bearer ${token}` }
                     }),
-                    fetch('/api/commands', {
+                    secureFetch('/api/commands', {
                         credentials: "include",
                         headers: { "Authorization": `Bearer ${token}` }
                     })
                 ]);
 
                 if (devicesRes.ok) {
-                    const devicesData = await devicesRes.json();
+                    const devicesData = await devicesRes.json<Device[]>();
                     if (devicesData.length > 0) {
                         setDevices([
                             {
@@ -106,7 +107,7 @@ export function CommandExecutionForm({
                 }
 
                 if (commandsRes.ok) {
-                    const commandsData = await commandsRes.json();
+                    const commandsData = await commandsRes.json<Command[]>();
                     setCommands(commandsData || []);
                 }
             } catch (error) {
@@ -138,13 +139,13 @@ export function CommandExecutionForm({
         const interval = setInterval(async () => {
             try {
                 const token = localStorage.getItem("accessToken");
-                const res = await fetch(`/api/status/${executionStatus.queue_id}`, {
+                const res = await secureFetch(`/api/status/${executionStatus.queue_id}`, {
                     credentials: "include",
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = await res.json<ExecutionStatus>();
                     setExecutionStatus(data);
 
                     if (data.status === 'done' || data.status === 'error') {
@@ -207,7 +208,7 @@ export function CommandExecutionForm({
             if (selectedDevice === "-1") {
                 url = "/api/execute/any";
             }
-            const response = await fetch(url, {
+            const response = await secureFetch(url, {
                 method: "POST",
                 credentials: "include",
                 headers: {
@@ -221,7 +222,7 @@ export function CommandExecutionForm({
                 }),
             });
 
-            const result = await response.json();
+            const result = await response.json<{queue_id: number, detail?: string}>();
 
             if (!response.ok) {
                 throw new Error(result.detail || "Failed to execute command");

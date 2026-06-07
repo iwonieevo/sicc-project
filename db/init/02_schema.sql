@@ -13,11 +13,15 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS devices (
     id               BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name             TEXT UNIQUE NOT NULL,
+    public_key_id    TEXT UNIQUE,
+    public_key       TEXT,
     status           TEXT NOT NULL DEFAULT 'offline',
     last_seen        TIMESTAMPTZ,
     registered_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    is_deleted       BOOLEAN NOT NULL DEFAULT FALSE
+    is_deleted       BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT chk_devices_public_key_pair
+        CHECK ((public_key_id IS NULL AND public_key IS NULL) OR (public_key_id IS NOT NULL AND public_key IS NOT NULL))
 );
 
 CREATE TABLE IF NOT EXISTS commands (

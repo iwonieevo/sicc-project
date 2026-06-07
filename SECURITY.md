@@ -11,19 +11,16 @@ This document describes the security measures applied at every layer of the syst
 
 User entries are stored in the database in a table with following columns:
 
-- `id` - A random UUIDv4
+- `id` - An auto-incremented integer primary key
 - `username` - Plaintext username
-- `password` - The hashed password of the username. Computed with argon2id
+- `hashed_password` - The hashed password of the username. Computed with argon2id
 - `last_seen` - A timezoned timestamp. Updated whenever the user performs any action from their account.
 - `created_at` - Assigned once, at the creation of the account
+- `is_deleted` - Soft-delete flag
 
 ## Sessions
 
 The primary web-based authentication method is done through short-lived (15-minute) JWT, signed with EdDSA. Refresh tokens are valid for 7 days, stored exclusively as `httpOnly` cookies. On every use, the refresh token is invalidated and a new one is issued.
-
-## 2FA
-
-Accounts are additionally protected by two-factor authentication with a time-based one-time password (RFC 6238 standard). Supported through every authenticator app (Google, Microsoft, Ente, etc.) Generated as a base32 secret, and shown to the user as a QR code generated during account setup - every subsequent login requires a valid code after the password. The secret as well as the backup codes are then encrypted with a dedicated key and stored in the database.
 
 # Encryption
 
@@ -32,53 +29,100 @@ Inspired by TLS, SICC uses a hybrid encryption model:
 1. We first perform a key exchange (X25519). Keys are ephemeral and per-session only - past sessions remain safe even if the current key is compromised.
 2. Symmetric encryption with AES-256-GCM. GCM mode provides both encryption and authentication, so any tampering with the ciphertext causes decryption to fail.
 
+## Handshake and Key Derivation
+
+The handshake transcript binds all negotiated parameters before any keys are derived. The transcript is defined as the concatenation of:
+`protocol_version || role || algorithm_suite || session_id || client_identity || server_identity || client_key_id || server_key_id || server_ephemeral_pubkey || client_ephemeral_pubkey || timestamp_ms`
+
+`client_identity` and `server_identity` are the logical names of the two parties (e.g. "frontend", "backend", "iot-server", or a device ID for RPi agents). `client_key_id` and `server_key_id` identify which long-term Ed25519 keypair each party is using, allowing the receiver to unambiguously look up the correct registered public key before verification.
+
+Concatenation is only unambiguous when field boundaries cannot shift. All transcript and AAD fields are encoded using one of two forms:
+
+- Fixed-size binary fields (keys, nonces, timestamps): written as raw bytes of their
+  defined length with no prefix.
+- Variable-length fields (identity strings, algorithm suite, protocol version): encoded
+  as a 2-byte big-endian length prefix followed by the UTF-8 bytes of the value.
+
+The X25519 shared secret is never used directly as an encryption key. Instead, HKDF (SHA-256) is applied over the shared secret and the SHA-256 hash of the full transcript:
+
+```
+ikm  = X25519(server_ephemeral_priv, client_ephemeral_pub)
+salt = SHA256(transcript)
+keys = HKDF-Expand(HKDF-Extract(salt, ikm), info, length=88)
+
+client_write_key = keys[0:32]   # AES-256-GCM, client -> server
+server_write_key = keys[32:64]  # AES-256-GCM, server -> client
+client_nonce_base = keys[64:76] # 96-bit nonce base, client -> server
+server_nonce_base = keys[76:88] # 96-bit nonce base, server -> client
+```
+
+Separate keys per direction prevent reflection attacks and eliminate nonce-space overlap between directions.
+
+Nonces are constructed as `nonce_base XOR seq` where `seq` is the per-direction sequence 96-bit big-endian integer (see Replay Prevention).
+
 ## Server Identity Verification
 
-Considering we operate on HTTP and cannot rely on HTTPS certificates for server verification, we deploy our own system: An Ed25519 keypair is generated before running any of the applications. The backend receives the private key (stored in .env - as mentioned before, we assume the host is perfectly secure), whereas the Raspberry Pi devices and frontend receive only the public keys.
+Each service in the system has its own long-term Ed25519 keypair generated prior to deployment. The backend and the IoT server are distinct services with distinct identities and do not share a private key. Every service stores its private key in its own `.env` (the host is assumed secure). Counterparties hold only the relevant public keys:
 
-During the handshake, the ephemeral public key is signed with its long-term Ed25519 private key. The client receives a payload of format `[public key] + [signature]`. Following that, each client (frontend/raspberry pi) can independently verify the signature with its Ed25519 public key. If the signature is invalid, then it is likely that someone is attempting a MitM attack. Obviously, such connection must be dropped at that point.
+- The frontend holds the backend's public key.
+- The backend holds the IoT server's public key (and vice versa).
+- The IoT server holds each registered RPi's public key.
 
-Because initial delivery over HTTP is inherently vulnerable, we assume the frontend application (and its bundled server public key) is distributed securely out-of-band, or we rely on Trust On First Use (TOFU).
+During the handshake, the server-role party signs the full handshake transcript (defined above) with its long-term Ed25519 private key. The client receives the server's ephemeral public key alongside this signature and can independently verify it against the known public key for that service identity (`server_key_id` from the transcript). A failed signature verification indicates a likely MitM attack and the connection must be dropped immediately.
+
+For browser-to-backend traffic, the frontend uses a server-authenticated ECDHE variant. The browser generates only an ephemeral X25519 key for the current in-memory transport session instaed of keeping a registered long-term Ed25519 identity. The backend signs the transcript with its long-term Ed25519 key, the browser verifies that signature using the pinned or TOFU backend public key, and normal user authentication happens inside the encrypted transport.
+
+## Trust On First Use (TOFU)
+
+Because the initial delivery of the frontend application (and its bundled server public key) occurs over plain HTTP, it is inherently vulnerable on first load. An attacker capable of intercepting that first request could substitute both the JavaScript bundle and the embedded public key before the crypto layer has any chance to run.
+This is a known and accepted limitation of the threat model. We mitigate it by assuming the frontend bundle is distributed securely out-of-band where possible. For cases relying on TOFU, the first connection is a weak point and is explicitly not claimed to provide the same guarantees as subsequent connections. Any deployment where first-load security is critical must use out-of-band key distribution.
 
 ## Raspberry Pi Identity Verification
 
-Similar to the Server Identity Verification mechanism, each RPi has its own Ed25519 keypair generated prior to deployment. The private key is stored in the RPi's `.env`, and the corresponding public key is registered in the backend's device registry. On each request, the RPi signs its ephemeral X25519 public key with its long-term Ed25519 private key, mirroring the frontend<->backend handshake. The backend verifies the signature against the registered public key.
+Each RPi agent has their own enrollment token, service identity, and a pair of Ed25519 keys for secure transport. The enrollment token, composed of a payload that contains: a version, an issuer, an agent_id, an unique jti, an 'issued at' timestamp and an expiry timestamp, and the signature of that payload created with the enrollment secret. While possible to launch and register an agent, the `scripts/agents.py` provides a convenient wrapper around the enrollment token generation, key generation and agent registration process.
+
+After registration, the corresponding public key is registered in the device registry. On each secure session initiation, the RPi signs the full handshake transcript (mirroring the frontend<->backend handshake, with `role` set accordingly) with its long-term Ed25519 private key. Any device whose public key is not in the shared device registry is rejected outright.
 
 # Attack prevention
 
-Every encrypted payload contains the following fields:
+## Envelope Format
 
-- Random nonce (12 bytes)
-- Unix timestamp (in ms)
-- Unique request ID
+```json
+{
+  "session_id": "...",
+  "seq": 42,
+  "ciphertext": "base64...",
+  "tag": "base64..."
+}
+```
 
-We reject everything older than 30 seconds, and maintains a short-lived cache of recent request IDs to block exact replays within that window.
+The actual request body, including all sensitive fields, lives inside ciphertext.
 
-As keys are ephemeral per session, random 96-bit nonces are safe from collision within this bound.
+## Additional Authenticated Data (AAD)
+
+The AAD field passed to AES-GCM on every message is:
+
+```
+protocol_version || session_id || direction || seq_as_96bit_big_endian
+```
+
+## Replay Prevention
+
+Each direction of each session maintains a monotonically increasing sequence number (`seq`), starting at 0 and incremented by 1 per message. The sequence number is
+cryptographically bound to the ciphertext via AAD (see above) without being encrypted.
+
+The receiver requires the incoming `seq` to be exactly equal to the next expected sequence number for that session and direction, and rejects anything else. This is stricter than "strictly greater than last seen" and eliminates any ambiguity around gaps or skipped messages. This design requires encrypted messages to be processed in strict send order per session.
+
+A timestamp (big-endian Unix milliseconds) is also included inside the encrypted envelope as a secondary sanity check. Messages timestamped more than 30 seconds in the past are rejected even if the sequence number would otherwise be valid.
 
 # Database
 
-As mentioned before, passwords and TOTP secrets are never stored in plaintext. Sensitive columns (for instance, execution results) are encrypted at column level with AES-256-GCM with appropriate keys.
-
 Database connections use TLS with a local self-signed CA. PostgreSQL presents a server certificate signed by this CA, and backend services verify it with `sslmode=verify-full`.
-
-# Logs
-
-As mentioned, we take additional precautions against even ourselves to ensure logs cannot be tampered with. A compromised admin could otherwise silently modify or delete plaintext audit log entries. All audit log entries are therefore hash-chained, making tampering mathematically detectable:
-
-```
-[1] = { data, hash: HMAC-SHA256(key, data) },
-[2] = { data, hash: HMAC-SHA256(key, data | prev_hash) }
-[3] = { data, hash: HMAC-SHA256(key, data | prev_hash) }
-```
-
-Editing any entry breaks every hash that follows it.
 
 # Flagging Malicious Activity
 
-- Every authentication-related user event is logged: Auth Success, Auth Fail, 2FA attempts, Token Refresh.
-- Requests are rate-limited per IP + per username - we deploy an exponential backoff after 5 consecutive failures
-- Bad requests (repeated nonces, failed signature verification, failed decryption) are all flagged and logged.
+- Every authentication-related user event is logged: Auth Success, Auth Fail, Token Refresh.
+- Bad requests (replay attempts, failed signature verification, failed decryption) are all flagged and logged.
 
 # Additional Precautions
 

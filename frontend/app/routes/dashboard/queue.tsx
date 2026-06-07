@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { formatParameterValue } from "~/lib/utils";
 import { ListPagination } from "~/components/list-pagination";
+import { secureFetch } from "~/lib/secure/secure-fetch";
 
 interface Device {
     id: number;
@@ -39,11 +40,11 @@ export default function QueuePage() {
         const fetchDevices = async () => {
             try {
                 const token = localStorage.getItem("accessToken");
-                const res = await fetch('/api/devices', {
+                const res = await secureFetch('/api/devices', {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = await res.json<Device[]>();
                     setDevices(data);
                     if (data.length > 0 && selectedDeviceId === null) {
                         setSelectedDeviceId(data[0].id);
@@ -67,11 +68,11 @@ export default function QueuePage() {
             if (limit === -1) {
                 url = `/api/devices/${selectedDeviceId}/queue`;
             }
-            const res = await fetch(url, {
+            const res = await secureFetch(url, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json<QueueItem[]>();
                 setQueueItems(data);
             }
         } catch (err) {
@@ -91,7 +92,7 @@ export default function QueuePage() {
         if (!selectedDeviceId) return;
         try {
             const token = localStorage.getItem("accessToken");
-            const res = await fetch(`/api/devices/${selectedDeviceId}/queue/${queueId}/cancel`, {
+            const res = await secureFetch(`/api/devices/${selectedDeviceId}/queue/${queueId}/cancel`, {
                 method: 'POST',
                 headers: { "Authorization": `Bearer ${token}` }
             });

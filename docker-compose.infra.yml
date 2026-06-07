@@ -6,6 +6,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    env_file:
+      - env/.env.frontend
     environment:
       - CHOKIDAR_USEPOLLING=true
       - BACKEND_URL=http://backend:8000
@@ -15,11 +17,14 @@ services:
       - public
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "${BACKEND_EXPOSED_PORT}:8000"
     volumes:
       - ./backend:/app
+      - ./security:/app/security:ro
       - type: bind
         source: ./db/certs
         target: /run/secrets/db-certs
@@ -27,15 +32,17 @@ services:
         bind:
           create_host_path: false
     env_file:
-      - .env
       - env/.env.backend
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
       - DB_USER=backend
+      - DB_BACKEND_PASSWORD=${DB_BACKEND_PASSWORD}
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
       - IOT_SERVER_URL=http://iot-server:7000
+      - SECURE_MODE=${SECURE_MODE:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -45,12 +52,24 @@ services:
       - public
       - internal
 
+  valkey:
+    image: valkey/valkey:9.1.0
+    ports:
+      - "${VALKEY_EXPOSED_PORT:-6379}:6379"
+    volumes:
+      - valkey_data:/data
+    networks:
+      - internal
+
   iot-server:
-    build: ./server-iot
+    build:
+      context: .
+      dockerfile: server-iot/Dockerfile
     ports:
       - "${IOT_SERVER_EXPOSED_PORT}:7000"
     volumes:
       - ./server-iot:/app
+      - ./security:/app/security:ro
       - type: bind
         source: ./db/certs
         target: /run/secrets/db-certs
@@ -58,17 +77,22 @@ services:
         bind:
           create_host_path: false
     env_file:
-      - .env
       - env/.env.server-iot
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
       - DB_USER=iot_server
+      - DB_IOT_PASSWORD=${DB_IOT_PASSWORD}
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
+      - SICC_VALKEY_URL=redis://valkey:6379/0
+      - SECURE_MODE=${SECURE_MODE:-false}
     depends_on:
       db:
         condition: service_healthy
+      valkey:
+        condition: service_started
     networks:
       - internal
       - agent-net
@@ -86,8 +110,12 @@ services:
         bind:
           create_host_path: false
       - ./db/config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-    env_file:
-      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_BACKEND_PASSWORD=${DB_BACKEND_PASSWORD}
+      - DB_IOT_PASSWORD=${DB_IOT_PASSWORD}
     command:
       - postgres
       - -c
@@ -114,3 +142,4 @@ networks:
 
 volumes:
   postgres_data:
+  valkey_data:
