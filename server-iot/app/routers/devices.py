@@ -1,10 +1,11 @@
+from app.agent_security import require_backend_transport
 from app.database import get_db
 from app.models import CommandExecution, Device, VCommandLog
 from app.schemas import DeviceResponse, QueueCancelResponse, QueueItemResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_backend_transport)])
 
 
 @router.get("/devices", response_model=list[DeviceResponse])

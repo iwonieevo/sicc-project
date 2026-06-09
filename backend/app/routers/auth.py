@@ -7,11 +7,16 @@ from app.auth import (
 )
 from app.database import get_db
 from app.models import User
+from app.plaintext_security import require_frontend_secure_transport
 from app.schemas import TokenResponse, UserLogin, UserRegister
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/api", tags=["auth"])
+router = APIRouter(
+    prefix="/api",
+    tags=["auth"],
+    dependencies=[Depends(require_frontend_secure_transport)],
+)
 
 
 @router.post("/signup")

@@ -21,6 +21,7 @@ from app.secure_transport import (
 from app.secure_transport import (
     settings as secure_settings,
 )
+from app.plaintext_security import require_frontend_secure_transport
 from fastapi import APIRouter, Depends, HTTPException
 
 from security import CryptoError
@@ -28,7 +29,11 @@ from security import CryptoError
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
 LOGGER = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["commands"])
+router = APIRouter(
+    prefix="/api",
+    tags=["commands"],
+    dependencies=[Depends(require_frontend_secure_transport)],
+)
 client = httpx.Client(timeout=10.0)
 
 

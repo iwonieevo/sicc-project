@@ -3,6 +3,10 @@ from typing import Any
 
 import httpx
 from app.auth import get_current_user
+from app.plaintext_security import (
+    INTERNAL_FRONTEND_TOKEN,
+    INTERNAL_FRONTEND_TOKEN_HEADER,
+)
 from app.secure_transport import initiate_backend_iot_handshake, settings
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -256,6 +260,7 @@ def _dispatch_frontend_plaintext_request(body: dict[str, Any]) -> dict[str, Any]
         and isinstance(value, str)
         and key.lower() in {"authorization", "content-type"}
     }
+    forwarded_headers[INTERNAL_FRONTEND_TOKEN_HEADER] = INTERNAL_FRONTEND_TOKEN
     response = local_client.request(
         method=method,
         url=path,

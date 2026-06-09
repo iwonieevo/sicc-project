@@ -6,6 +6,8 @@ from urllib.parse import unquote
 import httpx
 from app.agent_security import (
     AGENT_IDENTITY_HEADER,
+    INTERNAL_BACKEND_TOKEN,
+    INTERNAL_BACKEND_TOKEN_HEADER,
     INTERNAL_AGENT_TOKEN,
     INTERNAL_AGENT_TOKEN_HEADER,
 )
@@ -477,6 +479,7 @@ def _dispatch_plaintext_request(body: dict[str, Any]) -> dict[str, Any]:
         url=path,
         json=json_data,
         params=params,
+        headers={INTERNAL_BACKEND_TOKEN_HEADER: INTERNAL_BACKEND_TOKEN},
     )
     try:
         response_body = response.json()

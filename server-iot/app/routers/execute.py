@@ -1,5 +1,6 @@
 import logging
 
+from app.agent_security import require_backend_transport
 from app.database import get_db
 from app.models import Command, CommandParameter, CommandQueue, Device, VCommandLog
 from app.sanitization import sanitize_parameters
@@ -7,7 +8,7 @@ from app.schemas import CommandStatusResponse, ExecuteRequest, ExecuteResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_backend_transport)])
 LOGGER = logging.getLogger(__name__)
 
 

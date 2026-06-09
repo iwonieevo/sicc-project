@@ -1,10 +1,11 @@
+from app.agent_security import require_backend_transport
 from app.database import get_db
 from app.models import Command, CommandParameter
 from app.schemas import CommandCreateRequest, CommandParameterResponse, CommandResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_backend_transport)])
 
 
 @router.get("/commands", response_model=list[CommandResponse])
