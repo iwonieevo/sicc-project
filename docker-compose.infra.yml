@@ -41,6 +41,7 @@ services:
       - DB_BACKEND_PASSWORD=${DB_BACKEND_PASSWORD}
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
+      - SICC_VALKEY_URL=redis://:${VALKEY_PASSWORD}@valkey:6379/0
       - IOT_SERVER_URL=http://iot-server:7000
       - SECURE_MODE=${SECURE_MODE:-false}
     depends_on:
@@ -54,6 +55,10 @@ services:
 
   valkey:
     image: valkey/valkey:9.1.0
+    command:
+      - valkey-server
+      - --requirepass
+      - ${VALKEY_PASSWORD}
     ports:
       - "${VALKEY_EXPOSED_PORT:-6379}:6379"
     volumes:
@@ -86,7 +91,7 @@ services:
       - DB_IOT_PASSWORD=${DB_IOT_PASSWORD}
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
-      - SICC_VALKEY_URL=redis://valkey:6379/0
+      - SICC_VALKEY_URL=redis://:${VALKEY_PASSWORD}@valkey:6379/0
       - SECURE_MODE=${SECURE_MODE:-false}
     depends_on:
       db:

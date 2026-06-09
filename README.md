@@ -38,6 +38,7 @@ cp env/.env.server-iot.example env/.env.server-iot
 | `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                        |
 | `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service                |
 | `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server                     |
+| `VALKEY_PASSWORD`         | `changeme`        | Valkey password required by infra services         |
 | `ENV`                     | `development`     | Runtime environment (`development` / `production`) |
 
 ### `env/.env.agent`
@@ -68,6 +69,7 @@ cp env/.env.server-iot.example env/.env.server-iot
 | `JWT_SECRET_KEY`                  | `changeme`   | Secret used to sign JWTs                         |
 | `JWT_ALGORITHM`                   | `HS256`      | JWT signing algorithm                            |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`         | Token lifetime in minutes                        |
+| `SICC_VALKEY_URL`                 | `redis://:changeme@valkey:6379/0` | Authenticated Valkey URL for shared infra access |
 | `SICC_SERVICE_IDENTITY`           | `backend`    | Backend secure-transport identity                |
 | `SICC_SERVICE_KEY_ID`             | empty        | Backend key id derived from its public key       |
 | `SICC_SERVICE_PRIVATE_KEY_B64`    | empty        | Backend private Ed25519 service key              |
@@ -82,7 +84,7 @@ cp env/.env.server-iot.example env/.env.server-iot
 | --------------------------------- | ----------------------- | ------------------------------------------------------------- |
 | `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`                    | Seconds between health checks to mark inactive agents offline |
 | `SICC_AGENT_ENROLLMENT_SECRET`    | empty                   | Secret used to verify launcher-issued agent enrollment tokens |
-| `SICC_VALKEY_URL`                 | `redis://valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs         |
+| `SICC_VALKEY_URL`                 | `redis://:changeme@valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs         |
 | `SICC_SERVICE_IDENTITY`           | `iot-server`            | IoT server secure-transport identity                          |
 | `SICC_SERVICE_KEY_ID`             | empty                   | IoT server key id derived from its public key                 |
 | `SICC_SERVICE_PRIVATE_KEY_B64`    | empty                   | IoT server private Ed25519 service key                        |
