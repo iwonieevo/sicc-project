@@ -3,8 +3,8 @@ import os
 
 import httpx
 from app.auth import get_current_user
+from app.plaintext_security import require_frontend_secure_transport
 from app.schemas import (
-    CommandCreateRequest,
     CommandResponse,
     CommandStatusResponse,
     DeviceResponse,
@@ -21,7 +21,6 @@ from app.secure_transport import (
 from app.secure_transport import (
     settings as secure_settings,
 )
-from app.plaintext_security import require_frontend_secure_transport
 from fastapi import APIRouter, Depends, HTTPException
 
 from security import CryptoError
@@ -164,7 +163,9 @@ def execute_command_any_agent(
     if not isinstance(devices, list):
         raise HTTPException(status_code=404, detail="No devices found")
 
-    available_devices = [device for device in devices if device["status"] in ("online", "busy")]
+    available_devices = [
+        device for device in devices if device["status"] in ("online", "busy")
+    ]
 
     if not available_devices:
         raise HTTPException(status_code=404, detail="No available agents")
@@ -178,9 +179,14 @@ def execute_command_any_agent(
         )
 
         if not isinstance(queue, list):
-            raise HTTPException(status_code=500, detail=f"Error recovering queue for device_id{device['id']}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error recovering queue for device_id{device['id']}",
+            )
 
-        active_count = sum(1 for item in queue if item["status"] in ("queued", "running"))
+        active_count = sum(
+            1 for item in queue if item["status"] in ("queued", "running")
+        )
 
         device_loads.append(
             {
@@ -204,7 +210,9 @@ def execute_command_any_agent(
     )
 
     if not response_data:
-        raise HTTPException(status_code=502, detail="IoT server did not return a response")
+        raise HTTPException(
+            status_code=502, detail="IoT server did not return a response"
+        )
 
     queue_id = response_data["queue_id"]
 
@@ -235,18 +243,6 @@ def get_command_status(
     return forward_to_server(
         method="GET",
         path=f"/status/{queue_id}",
-    )
-
-
-@router.post("/commands", response_model=CommandResponse)
-def create_command(
-    request: CommandCreateRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    return forward_to_server(
-        method="POST",
-        path="/commands",
-        json_data=model_to_dict(request),
     )
 
 
