@@ -79,9 +79,11 @@ This is a known and accepted limitation of the threat model. We mitigate it by a
 
 ## Raspberry Pi Identity Verification
 
-Each RPi agent has their own enrollment token, service identity, and a pair of Ed25519 keys for secure transport. The enrollment token, composed of a payload that contains: a version, an issuer, an agent_id, an unique jti, an 'issued at' timestamp and an expiry timestamp, and the signature of that payload created with the enrollment secret. While possible to launch and register an agent, the `scripts/agents.py` provides a convenient wrapper around the enrollment token generation, key generation and agent registration process.
+Each RPi agent has their own enrollment token, service identity, and a pair of Ed25519 keys for secure transport. The enrollment token payload contains a version, issuer, agent_id, public_key_id, unique jti, issued-at timestamp, expiry timestamp, and an HMAC signature created with the enrollment secret. Binding the token to the generated public_key_id prevents a captured token from being reused to register a different agent key. The `scripts/agents.py` wrapper generates the token and keypair together.
 
-After registration, the corresponding public key is registered in the device registry. On each secure session initiation, the RPi signs the full handshake transcript (mirroring the frontend<->backend handshake, with `role` set accordingly) with its long-term Ed25519 private key. Any device whose public key is not in the shared device registry is rejected outright.
+In secure mode, the agent first opens a server-authenticated `agent-enrollment` session using its pinned IoT server public key - similar to how frontend<->backend handshakes are made, then sends the enrollment token and generated public key inside the encrypted channel.
+
+After registration, the corresponding public key is registered in the device registry. On each secure session initiation, the RPi signs the full handshake transcript with its long-term Ed25519 private key. Any device whose public key is not in the shared device registry is rejected outright.
 
 # Attack prevention
 

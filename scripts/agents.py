@@ -119,6 +119,7 @@ def load_enrollment_secret() -> str:
 def create_enrollment_token(
     secret: str,
     agent_name: str,
+    public_key_id: str,
     ttl_seconds: int = ENROLLMENT_TTL_SECONDS,
 ) -> str:
     issued_at = int(time())
@@ -130,6 +131,7 @@ def create_enrollment_token(
         "v": 1,
         "iss": "agents.py",
         "agent_id": agent_name,
+        "public_key_id": public_key_id,
         "jti": secrets.token_urlsafe(32),
         "iat": issued_at,
         "exp": expires_at,
@@ -149,16 +151,18 @@ def build_generated_agent_env(
     agent_name: str,
 ) -> dict[str, str]:
     keypair = generate_ed25519_keypair()
+    key_id = public_key_id(keypair.public_key)
     token = create_enrollment_token(
         load_enrollment_secret(),
         agent_name,
+        key_id,
         ttl_seconds=ENROLLMENT_TTL_SECONDS,
     )
     return {
         "AGENT_ENROLLMENT_TOKEN": token,
         "AGENT_NAME": agent_name,
         "SICC_SERVICE_IDENTITY": agent_name,
-        "SICC_SERVICE_KEY_ID": public_key_id(keypair.public_key),
+        "SICC_SERVICE_KEY_ID": key_id,
         "SICC_SERVICE_PRIVATE_KEY_B64": b64encode(keypair.private_key),
         "SICC_SERVICE_PUBLIC_KEY_B64": b64encode(keypair.public_key),
     }
@@ -223,6 +227,7 @@ def cmd_start(args):
                     "-p",
                     COMPOSE_PROJECT,
                     "run",
+                    "--build",
                     "-d",
                     "--name",
                     name,

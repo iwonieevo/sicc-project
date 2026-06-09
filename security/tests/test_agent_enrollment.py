@@ -42,6 +42,7 @@ def token_payload(**overrides):
         "v": 1,
         "iss": "agents.py",
         "agent_id": "agent-alpha",
+        "public_key_id": "agent-key-id",
         "jti": "token-id",
         "iat": now,
         "exp": now + 60,
@@ -55,10 +56,12 @@ def test_verify_enrollment_token_accepts_valid_payload():
         "secret",
         signed_token("secret", token_payload()),
         "agent-alpha",
+        public_key_id="agent-key-id",
     )
 
     assert claims == EnrollmentTokenClaims(
         agent_id="agent-alpha",
+        public_key_id="agent-key-id",
         jti="token-id",
         issued_at=claims.issued_at,
         expires_at=claims.expires_at,
@@ -87,11 +90,26 @@ def test_verify_enrollment_token_rejects_wrong_agent():
     assert verify_enrollment_token("secret", token, "agent-beta") is None
 
 
+def test_verify_enrollment_token_rejects_wrong_public_key_id():
+    token = signed_token("secret", token_payload(public_key_id="agent-key-id"))
+
+    assert (
+        verify_enrollment_token(
+            "secret",
+            token,
+            "agent-alpha",
+            public_key_id="attacker-key-id",
+        )
+        is None
+    )
+
+
 def test_consume_enrollment_jti_rejects_duplicate(monkeypatch):
     client = FakeValkey()
     monkeypatch.setattr(enrollment, "_client", client)
     claims = EnrollmentTokenClaims(
         agent_id="agent-alpha",
+        public_key_id="agent-key-id",
         jti="duplicate-token-id",
         issued_at=int(time.time()),
         expires_at=int(time.time()) + 60,
@@ -106,6 +124,7 @@ def test_consume_enrollment_jti_rejects_expired_claims(monkeypatch):
     monkeypatch.setattr(enrollment, "_client", client)
     claims = EnrollmentTokenClaims(
         agent_id="agent-alpha",
+        public_key_id="agent-key-id",
         jti="expired-token-id",
         issued_at=int(time.time()) - 120,
         expires_at=int(time.time()) - 60,

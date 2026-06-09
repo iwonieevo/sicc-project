@@ -19,6 +19,7 @@ from .settings import SecureTransportSettings
 
 ROLE_BACKEND_IOT = "backend-iot"
 ROLE_AGENT_IOT = "agent-iot"
+ROLE_AGENT_ENROLLMENT = "agent-enrollment"
 ROLE_FRONTEND_BACKEND = "frontend-backend"
 
 

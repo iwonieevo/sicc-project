@@ -1,4 +1,6 @@
 import logging
+import os
+import time
 from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import unquote
@@ -18,6 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from security import (
+    ROLE_AGENT_ENROLLMENT,
     ROLE_AGENT_IOT,
     ROLE_BACKEND_IOT,
     CryptoError,
@@ -29,6 +32,7 @@ from security import (
     SecureTransportSettings,
     ServerHandshake,
     create_server_handshake,
+    create_server_authenticated_handshake,
     decode_handshake_field,
     decrypt_envelope,
     encrypt_envelope,
@@ -42,24 +46,62 @@ LOGGER = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/secure/backend-iot", tags=["secure-transport"])
 agent_iot_router = APIRouter(prefix="/secure/agent-iot", tags=["secure-transport"])
+agent_enrollment_router = APIRouter(
+    prefix="/secure/agent-enrollment", tags=["secure-transport"]
+)
 
 settings = load_secure_transport_settings(default_identity="iot-server")
 
 session_store = SecureSessionStore()
 agent_session_store = SecureSessionStore()
+agent_enrollment_session_store = SecureSessionStore()
 
 local_client = httpx.Client(base_url="http://127.0.0.1:7000", timeout=10.0)
 
 
-# TODO: add ttl pruning here
-pending_handshakes: dict[str, ServerHandshake] = {}
-pending_agent_handshakes: dict[str, "PendingAgentHandshake"] = {}
+PENDING_HANDSHAKE_TTL_SECONDS = int(os.getenv("SICC_PENDING_HANDSHAKE_TTL_SECONDS", "60"))
 
 
 @dataclass(frozen=True)
 class PendingAgentHandshake:
     handshake: ServerHandshake
     verifier_settings: SecureTransportSettings
+
+
+class PendingHandshakeStore:
+    """Tiny in-memory pending handshake store with lazy TTL cleanup."""
+
+    def __init__(self, ttl_seconds: int):
+        self.ttl_seconds = ttl_seconds
+        self._values: dict[str, tuple[float, Any]] = {}
+
+    def put(self, session_id: str, value: Any) -> None:
+        self.prune()
+        self._values[session_id] = (time.monotonic(), value)
+
+    def pop(self, session_id: str) -> Any | None:
+        self.prune()
+        item = self._values.pop(session_id, None)
+        if item is None:
+            return None
+        return item[1]
+
+    def prune(self) -> None:
+        if self.ttl_seconds < 1:
+            self._values.clear()
+            return
+        cutoff = time.monotonic() - self.ttl_seconds
+        stale = [
+            session_id
+            for session_id, (created_at, _) in self._values.items()
+            if created_at < cutoff
+        ]
+        for session_id in stale:
+            self._values.pop(session_id, None)
+
+
+pending_handshakes = PendingHandshakeStore(PENDING_HANDSHAKE_TTL_SECONDS)
+pending_agent_handshakes = PendingHandshakeStore(PENDING_HANDSHAKE_TTL_SECONDS)
 
 
 class BackendIotHandshakeStartRequest(BaseModel):
@@ -148,6 +190,39 @@ class AgentIotEncryptedRequest(BaseModel):
     tag: str
 
 
+class AgentEnrollmentHandshakeStartRequest(BaseModel):
+    role: str
+    session_id: str
+    client_identity: str
+    server_identity: str
+    client_key_id: str
+    server_key_id: str
+    client_ephemeral_pubkey: str
+    timestamp_ms: int
+
+
+class AgentEnrollmentHandshakeStartResponse(BaseModel):
+    protocol_version: str
+    algorithm_suite: str
+    role: str
+    session_id: str
+    client_identity: str
+    server_identity: str
+    client_key_id: str
+    server_key_id: str
+    server_ephemeral_pubkey: str
+    client_ephemeral_pubkey: str
+    timestamp_ms: int
+    server_signature: str
+
+
+class AgentEnrollmentEncryptedRequest(BaseModel):
+    session_id: str
+    seq: int
+    ciphertext: str
+    tag: str
+
+
 @router.post("/handshake/start", response_model=BackendIotHandshakeStartResponse)
 def start_backend_iot_handshake(request: BackendIotHandshakeStartRequest):
     """Accept the backend's start message and return the signed server transcript."""
@@ -176,7 +251,7 @@ def start_backend_iot_handshake(request: BackendIotHandshakeStartRequest):
     except Exception as exc:
         _raise_handshake_error(exc)
 
-    pending_handshakes[handshake.transcript.session_id] = handshake
+    pending_handshakes.put(handshake.transcript.session_id, handshake)
     LOGGER.info(
         "Started backend-IoT secure handshake session %s",
         handshake.transcript.session_id,
@@ -201,7 +276,7 @@ def start_backend_iot_handshake(request: BackendIotHandshakeStartRequest):
 def finish_backend_iot_handshake(request: BackendIotHandshakeFinishRequest):
     """Verify the backend's transcript signature and promote the pending session."""
 
-    handshake = pending_handshakes.pop(request.session_id, None)
+    handshake = pending_handshakes.pop(request.session_id)
     if handshake is None:
         raise HTTPException(status_code=404, detail="handshake not found")
 
@@ -306,9 +381,12 @@ def start_agent_iot_handshake(
     except Exception as exc:
         _raise_handshake_error(exc)
 
-    pending_agent_handshakes[handshake.transcript.session_id] = PendingAgentHandshake(
-        handshake=handshake,
-        verifier_settings=verifier_settings,
+    pending_agent_handshakes.put(
+        handshake.transcript.session_id,
+        PendingAgentHandshake(
+            handshake=handshake,
+            verifier_settings=verifier_settings,
+        ),
     )
     LOGGER.info(
         "Started agent-IoT secure handshake session %s for %s",
@@ -337,7 +415,7 @@ def start_agent_iot_handshake(
 def finish_agent_iot_handshake(request: AgentIotHandshakeFinishRequest):
     """Verify the agent transcript signature and promote the pending session."""
 
-    pending = pending_agent_handshakes.pop(request.session_id, None)
+    pending = pending_agent_handshakes.pop(request.session_id)
     if pending is None:
         raise HTTPException(status_code=404, detail="handshake not found")
 
@@ -395,6 +473,108 @@ def handle_encrypted_agent_iot_request(request: AgentIotEncryptedRequest):
             recv_state.accept_recv_seq(envelope.seq)
             response_body = _dispatch_agent_plaintext_request(
                 request_body, session.transcript.client_identity
+            )
+            seq = session.replay.state_for(
+                Direction.SERVER_TO_CLIENT
+            ).allocate_send_seq()
+            response_envelope = encrypt_envelope(
+                response_body,
+                session.keys,
+                session.transcript.protocol_version,
+                session.transcript.session_id,
+                Direction.SERVER_TO_CLIENT,
+                seq=seq,
+            )
+            return response_envelope.to_dict()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            _raise_handshake_error(exc)
+
+
+@agent_enrollment_router.post(
+    "/handshake/start", response_model=AgentEnrollmentHandshakeStartResponse
+)
+def start_agent_enrollment_handshake(request: AgentEnrollmentHandshakeStartRequest):
+    """Start a server-authenticated encrypted session for first agent enrollment."""
+
+    try:
+        client_ephemeral_pubkey = decode_handshake_field(
+            request.client_ephemeral_pubkey
+        )
+        start = HandshakeStart(
+            role=request.role,
+            session_id=request.session_id,
+            client_identity=request.client_identity,
+            server_identity=request.server_identity,
+            client_key_id=request.client_key_id,
+            server_key_id=request.server_key_id,
+            client_ephemeral_pubkey=client_ephemeral_pubkey,
+            timestamp_ms=request.timestamp_ms,
+        )
+        handshake = create_server_authenticated_handshake(
+            settings,
+            start,
+            expected_role=ROLE_AGENT_ENROLLMENT,
+            expected_server_identity=settings.identity,
+        )
+    except Exception as exc:
+        _raise_handshake_error(exc)
+
+    agent_enrollment_session_store.put(
+        SecureSession(transcript=handshake.transcript, keys=handshake.keys)
+    )
+    LOGGER.info(
+        "Started agent enrollment secure session %s for %s",
+        handshake.transcript.session_id,
+        handshake.transcript.client_identity,
+    )
+    return AgentEnrollmentHandshakeStartResponse(
+        protocol_version=handshake.transcript.protocol_version,
+        algorithm_suite=handshake.transcript.algorithm_suite,
+        role=handshake.transcript.role,
+        session_id=handshake.transcript.session_id,
+        client_identity=handshake.transcript.client_identity,
+        server_identity=handshake.transcript.server_identity,
+        client_key_id=handshake.transcript.client_key_id,
+        server_key_id=handshake.transcript.server_key_id,
+        server_ephemeral_pubkey=b64encode(handshake.transcript.server_ephemeral_pubkey),
+        client_ephemeral_pubkey=b64encode(handshake.transcript.client_ephemeral_pubkey),
+        timestamp_ms=handshake.transcript.timestamp_ms,
+        server_signature=b64encode(handshake.server_signature),
+    )
+
+
+@agent_enrollment_router.post("/request")
+def handle_encrypted_agent_enrollment_request(request: AgentEnrollmentEncryptedRequest):
+    """Decrypt a first-enrollment request and dispatch only agent registration."""
+
+    agent_enrollment_session_store.prune_older_than(PENDING_HANDSHAKE_TTL_SECONDS)
+    envelope = SecureEnvelope(
+        session_id=request.session_id,
+        seq=request.seq,
+        ciphertext=request.ciphertext,
+        tag=request.tag,
+    )
+    session = agent_enrollment_session_store.get(envelope.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="secure session not found")
+
+    with session.lock:
+        try:
+            recv_state = session.replay.state_for(Direction.CLIENT_TO_SERVER)
+            recv_state.check_recv_seq(envelope.seq)
+            request_body = decrypt_envelope(
+                envelope,
+                session.keys,
+                session.transcript.protocol_version,
+                Direction.CLIENT_TO_SERVER,
+                max_skew_ms=settings.max_skew_ms,
+            )
+            recv_state.accept_recv_seq(envelope.seq)
+            response_body = _dispatch_agent_enrollment_plaintext_request(
+                request_body,
+                session.transcript.client_identity,
             )
             seq = session.replay.state_for(
                 Direction.SERVER_TO_CLIENT
@@ -516,6 +696,40 @@ def _dispatch_agent_plaintext_request(
         url=path,
         json=json_data,
         params=params,
+        headers={
+            INTERNAL_AGENT_TOKEN_HEADER: INTERNAL_AGENT_TOKEN,
+            AGENT_IDENTITY_HEADER: agent_identity,
+        },
+    )
+    try:
+        response_body = response.json()
+    except ValueError:
+        response_body = {"message": response.text}
+
+    return {
+        "status_code": response.status_code,
+        "body": response_body,
+    }
+
+
+def _dispatch_agent_enrollment_plaintext_request(
+    body: dict[str, Any], agent_identity: str
+) -> dict[str, Any]:
+    method = body.get("method")
+    path = body.get("path")
+    json_data = body.get("json")
+
+    if method != "POST" or path != "/agent/register":
+        raise ValueError("unsupported forwarded enrollment path")
+    if json_data is not None and not isinstance(json_data, dict):
+        raise ValueError("forwarded enrollment json must be an object")
+    if not isinstance(json_data, dict):
+        raise ValueError("forwarded enrollment json is required")
+
+    response = local_client.request(
+        method=method,
+        url=path,
+        json=json_data,
         headers={
             INTERNAL_AGENT_TOKEN_HEADER: INTERNAL_AGENT_TOKEN,
             AGENT_IDENTITY_HEADER: agent_identity,

@@ -25,20 +25,20 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ### `.env`
 
-| Variable                  | Default           | Description                                        |
-| ------------------------- | ----------------- | -------------------------------------------------- |
-| `FRONTEND_EXPOSED_PORT`   | `3000`            | Host port for the frontend                         |
-| `BACKEND_EXPOSED_PORT`    | `8000`            | Host port for the backend                          |
-| `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port for the IoT server                       |
-| `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port for PostgreSQL                           |
-| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents     |
-| `AGENT_LABEL`             | `sicc.role=agent` | Label applied to agent containers                  |
-| `POSTGRES_DB`             | `sicc`            | Database name                                      |
-| `POSTGRES_USER`           | `admin`           | Postgres superuser name                            |
-| `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                        |
-| `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service                |
-| `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server                     |
-| `VALKEY_PASSWORD`         | `changeme`        | Valkey password required by infra services         |
+| Variable                  | Default           | Description                                    |
+| ------------------------- | ----------------- | ---------------------------------------------- |
+| `FRONTEND_EXPOSED_PORT`   | `3000`            | Host port for the frontend                     |
+| `BACKEND_EXPOSED_PORT`    | `8000`            | Host port for the backend                      |
+| `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port for the IoT server                   |
+| `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port for PostgreSQL                       |
+| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents |
+| `AGENT_LABEL`             | `sicc.role=agent` | Label applied to agent containers              |
+| `POSTGRES_DB`             | `sicc`            | Database name                                  |
+| `POSTGRES_USER`           | `admin`           | Postgres superuser name                        |
+| `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                    |
+| `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service            |
+| `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server                 |
+| `VALKEY_PASSWORD`         | `changeme`        | Valkey password required by infra services     |
 
 ### `env/.env.agent`
 
@@ -63,32 +63,33 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ### `env/.env.backend`
 
-| Variable                          | Default      | Description                                      |
-| --------------------------------- | ------------ | ------------------------------------------------ |
-| `JWT_SECRET_KEY`                  | `changeme`   | Secret used to sign JWTs                         |
-| `JWT_ALGORITHM`                   | `HS256`      | JWT signing algorithm                            |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`         | Token lifetime in minutes                        |
+| Variable                          | Default                           | Description                                      |
+| --------------------------------- | --------------------------------- | ------------------------------------------------ |
+| `JWT_SECRET_KEY`                  | `changeme`                        | Secret used to sign JWTs                         |
+| `JWT_ALGORITHM`                   | `HS256`                           | JWT signing algorithm                            |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`                              | Token lifetime in minutes                        |
 | `SICC_VALKEY_URL`                 | `redis://:changeme@valkey:6379/0` | Authenticated Valkey URL for shared infra access |
-| `SICC_SERVICE_IDENTITY`           | `backend`    | Backend secure-transport identity                |
-| `SICC_SERVICE_KEY_ID`             | empty        | Backend key id derived from its public key       |
-| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty        | Backend private Ed25519 service key              |
-| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`         | Trusted public keys; must include the IoT server |
-| `SICC_IOT_SERVER_IDENTITY`        | `iot-server` | Expected IoT server service identity             |
-| `SICC_IOT_SERVER_KEY_ID`          | empty        | Required IoT server public key id                |
-| `SICC_MAX_SKEW_MS`                | `30000`      | Maximum secure-message timestamp skew            |
+| `SICC_SERVICE_IDENTITY`           | `backend`                         | Backend secure-transport identity                |
+| `SICC_SERVICE_KEY_ID`             | empty                             | Backend key id derived from its public key       |
+| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty                             | Backend private Ed25519 service key              |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`                              | Trusted public keys; must include the IoT server |
+| `SICC_IOT_SERVER_IDENTITY`        | `iot-server`                      | Expected IoT server service identity             |
+| `SICC_IOT_SERVER_KEY_ID`          | empty                             | Required IoT server public key id                |
+| `SICC_MAX_SKEW_MS`                | `30000`                           | Maximum secure-message timestamp skew            |
 
 ### `env/.env.server-iot`
 
-| Variable                          | Default                 | Description                                                   |
-| --------------------------------- | ----------------------- | ------------------------------------------------------------- |
-| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`                    | Seconds between health checks to mark inactive agents offline |
-| `SICC_AGENT_ENROLLMENT_SECRET`    | empty                   | Secret used to verify launcher-issued agent enrollment tokens |
-| `SICC_VALKEY_URL`                 | `redis://:changeme@valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs         |
-| `SICC_SERVICE_IDENTITY`           | `iot-server`            | IoT server secure-transport identity                          |
-| `SICC_SERVICE_KEY_ID`             | empty                   | IoT server key id derived from its public key                 |
-| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty                   | IoT server private Ed25519 service key                        |
-| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`                    | Trusted public keys; must include backend keys                |
-| `SICC_MAX_SKEW_MS`                | `30000`                 | Maximum secure-message timestamp skew                         |
+| Variable                             | Default                           | Description                                                              |
+| ------------------------------------ | --------------------------------- | ------------------------------------------------------------------------ |
+| `DEVICE_MONITOR_INTERVAL_SECONDS`    | `15`                              | Seconds between health checks to mark inactive agents offline            |
+| `SICC_AGENT_ENROLLMENT_SECRET`       | empty                             | Secret used to verify launcher-issued agent enrollment tokens            |
+| `SICC_VALKEY_URL`                    | `redis://:changeme@valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs                    |
+| `SICC_SERVICE_IDENTITY`              | `iot-server`                      | IoT server secure-transport identity                                     |
+| `SICC_SERVICE_KEY_ID`                | empty                             | IoT server key id derived from its public key                            |
+| `SICC_SERVICE_PRIVATE_KEY_B64`       | empty                             | IoT server private Ed25519 service key                                   |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`      | `{}`                              | Trusted public keys; must include backend keys                           |
+| `SICC_MAX_SKEW_MS`                   | `30000`                           | Maximum secure-message timestamp skew                                    |
+| `SICC_PENDING_HANDSHAKE_TTL_SECONDS` | `60`                              | Maximum age for pending secure handshakes and unused enrollment sessions |
 
 ---
 
@@ -144,9 +145,9 @@ python scripts/agents.py start agent-alpha agent-beta agent-gamma
 
 The agent name is arbitrary — any string matching `[a-zA-Z0-9][a-zA-Z0-9_.-]+` is valid.
 
-When `SECURE_MODE=true`, `scripts/agents.py start <name>` is the trusted operator launcher. For every newly created agent container it generates:
+When `SECURE_MODE=true`, `scripts/agents.py start <name>` is the trusted operator launcher. For every newly created agent container it rebuilds the agent image and generates:
 
-- a short-lived enrollment token for that exact agent name;
+- a short-lived enrollment token for that exact agent name and generated public key id;
 - a fresh Ed25519 agent identity key;
 - the matching key id and runtime environment values.
 

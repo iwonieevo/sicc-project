@@ -28,13 +28,17 @@ def _get_client() -> Valkey:
 @dataclass(frozen=True)
 class EnrollmentTokenClaims:
     agent_id: str
+    public_key_id: str | None
     jti: str
     issued_at: int
     expires_at: int
 
 
 def verify_enrollment_token(
-    secret: str, token: str, agent_name: str
+    secret: str,
+    token: str,
+    agent_name: str,
+    public_key_id: str | None = None,
 ) -> EnrollmentTokenClaims | None:
     try:
         payload_part, signature_part = token.split(".", 1)
@@ -55,6 +59,12 @@ def verify_enrollment_token(
         return None
     if payload.get("agent_id", payload.get("sub")) != agent_name:
         return None
+    token_public_key_id = payload.get("public_key_id")
+    if public_key_id is not None:
+        if token_public_key_id != public_key_id:
+            return None
+    elif token_public_key_id is not None and not isinstance(token_public_key_id, str):
+        return None
 
     jti = payload.get("jti")
     issued_at = payload.get("iat")
@@ -74,6 +84,7 @@ def verify_enrollment_token(
 
     return EnrollmentTokenClaims(
         agent_id=agent_name,
+        public_key_id=token_public_key_id,
         jti=jti,
         issued_at=issued_at,
         expires_at=expires_at,

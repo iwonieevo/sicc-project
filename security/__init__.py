@@ -26,6 +26,7 @@ from .errors import (
 from .replay import DirectionState, SessionReplayState
 from .service_handshake import (
     ROLE_AGENT_IOT,
+    ROLE_AGENT_ENROLLMENT,
     ROLE_BACKEND_IOT,
     ROLE_FRONTEND_BACKEND,
     ClientHandshake,
@@ -56,6 +57,7 @@ __all__ = [
     "HandshakeStart",
     "KeyPair",
     "ROLE_AGENT_IOT",
+    "ROLE_AGENT_ENROLLMENT",
     "ROLE_BACKEND_IOT",
     "ROLE_FRONTEND_BACKEND",
     "ReplayError",
