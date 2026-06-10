@@ -97,9 +97,21 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ```bash
 python scripts/generator.py db-certs
+python scripts/generator.py frontend-certs
 ```
 
 This creates a local CA and a PostgreSQL server certificate under `db/certs/`. The script refuses to overwrite existing certificates - delete the files in `db/certs/` first if you need to regenerate them.
+
+The frontend certificate is written to `frontend/certs/` and is mounted read-only
+by the production compose file. By default it is valid for `localhost` and
+`127.0.0.1`; add extra names or addresses with repeated `--host` flags:
+
+```bash
+python scripts/generator.py frontend-certs --host localhost --host 127.0.0.1 --host your.domain.example
+```
+
+For a real public deployment, replace the generated self-signed frontend
+certificate with a certificate trusted by clients.
 
 ---
 
@@ -124,9 +136,9 @@ For production-style startup, use:
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-The production compose file builds the frontend before serving it, disables
-reload, forces `SECURE_MODE=true` for backend services, and does not publish
-PostgreSQL or Valkey host ports.
+The production compose file builds the frontend before serving it over HTTPS,
+disables reload, forces `SECURE_MODE=true` for backend services, and does not
+publish PostgreSQL or Valkey host ports.
 
 Production frontend builds consume `env/.env.frontend` as a Docker BuildKit
 build secret because Vite embeds `VITE_SICC_BACKEND_*` values at build time.
@@ -277,7 +289,7 @@ Commands:
 
 Once running, services are available on the ports configured in `.env`:
 
-- Frontend: [http://localhost:3000](http://localhost:3000) (`FRONTEND_EXPOSED_PORT`)
+- Frontend: [https://localhost:3000](https://localhost:3000) (`FRONTEND_EXPOSED_PORT`)
 - Backend API: [http://localhost:8000](http://localhost:8000) (`BACKEND_EXPOSED_PORT`)
 - IoT Server: [http://localhost:7000](http://localhost:7000) (`IOT_SERVER_EXPOSED_PORT`)
 

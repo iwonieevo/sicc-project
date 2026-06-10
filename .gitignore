@@ -6,6 +6,7 @@ env/*
 env/agents/*
 !env/agents/.env.agent-name.example
 db/certs/
+frontend/certs/
 
 # OS
 .DS_Store

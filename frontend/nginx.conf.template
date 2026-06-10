@@ -1,9 +1,20 @@
 server {
-    listen ${PORT};
+    listen ${PORT} ssl;
     server_name _;
+
+    ssl_certificate /run/secrets/frontend-certs/server.crt;
+    ssl_certificate_key /run/secrets/frontend-certs/server.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
 
     root /usr/share/nginx/html;
     index index.html;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
 
     location /assets/ {
         try_files $uri =404;

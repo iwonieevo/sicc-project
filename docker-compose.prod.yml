@@ -7,6 +7,13 @@ services:
         - frontend_env
     ports:
       - "${FRONTEND_EXPOSED_PORT}:3000"
+    volumes:
+      - type: bind
+        source: ./frontend/certs
+        target: /run/secrets/frontend-certs
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       - BACKEND_URL=http://backend:8000
     depends_on:

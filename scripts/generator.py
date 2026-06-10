@@ -21,9 +21,12 @@ from security import generate_ed25519_keypair, public_key_id
 from security.encoding import b64encode
 
 CERT_DIR = Path("db/certs")
+FRONTEND_CERT_DIR = Path("frontend/certs")
 POSTGRES_HOST = "db"
+FRONTEND_DEFAULT_HOSTS = ["localhost", "127.0.0.1"]
 DEFAULT_DAYS = 3650
 CA_COMMON_NAME = "SICC Local Database CA"
+FRONTEND_COMMON_NAME = "SICC Local Frontend"
 
 
 def cmd_secret() -> None:
@@ -62,6 +65,16 @@ def san_for_host(host: str) -> x509.SubjectAlternativeName:
         return x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address(host))])
     except ValueError:
         return x509.SubjectAlternativeName([x509.DNSName(host)])
+
+
+def san_for_hosts(hosts: list[str]) -> x509.SubjectAlternativeName:
+    names: list[x509.GeneralName] = []
+    for host in hosts:
+        try:
+            names.append(x509.IPAddress(ipaddress.ip_address(host)))
+        except ValueError:
+            names.append(x509.DNSName(host))
+    return x509.SubjectAlternativeName(names)
 
 
 def write_private_key(path: Path, key: rsa.RSAPrivateKey) -> None:
@@ -170,6 +183,44 @@ def build_server_cert(
     )
 
 
+def build_self_signed_frontend_cert(
+    server_key: rsa.RSAPrivateKey,
+    hosts: list[str],
+    days: int,
+    now: datetime,
+) -> x509.Certificate:
+    name = subject(FRONTEND_COMMON_NAME)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(server_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=days))
+        .add_extension(san_for_hosts(hosts), critical=False)
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+            critical=False,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(private_key=server_key, algorithm=hashes.SHA256())
+    )
+
+
 def cmd_db_certs(days: int) -> None:
     CERT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -202,6 +253,28 @@ def cmd_db_certs(days: int) -> None:
     write_certificate(server_crt_path, server_cert)
 
 
+def cmd_frontend_certs(days: int, hosts: list[str]) -> None:
+    FRONTEND_CERT_DIR.mkdir(parents=True, exist_ok=True)
+
+    server_key_path = FRONTEND_CERT_DIR / "server.key"
+    server_crt_path = FRONTEND_CERT_DIR / "server.crt"
+
+    refuse_overwrite([server_key_path, server_crt_path], FRONTEND_CERT_DIR)
+
+    unique_hosts = list(dict.fromkeys(hosts))
+    now = datetime.now(UTC)
+    server_key = private_key(2048)
+    server_cert = build_self_signed_frontend_cert(
+        server_key,
+        unique_hosts,
+        days,
+        now,
+    )
+
+    write_private_key(server_key_path, server_key)
+    write_certificate(server_crt_path, server_cert)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate SICC secrets and keypairs.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -217,6 +290,24 @@ def main() -> None:
         default=DEFAULT_DAYS,
         help="Number of days the certificate is valid for",
     )
+    frontend_certparser = subparsers.add_parser(
+        "frontend-certs", help="Generate frontend HTTPS certificate"
+    )
+    frontend_certparser.add_argument(
+        "--days",
+        type=int,
+        default=DEFAULT_DAYS,
+        help="Number of days the certificate is valid for",
+    )
+    frontend_certparser.add_argument(
+        "--host",
+        action="append",
+        default=[],
+        help=(
+            "DNS name or IP address to include in the certificate SAN. "
+            "Can be passed multiple times. Defaults to localhost and 127.0.0.1."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -228,6 +319,11 @@ def main() -> None:
         if args.days <= 0:
             parser.error("--days must be greater than 0")
         cmd_db_certs(args.days)
+    elif args.command == "frontend-certs":
+        if args.days <= 0:
+            parser.error("--days must be greater than 0")
+        hosts = args.host or FRONTEND_DEFAULT_HOSTS
+        cmd_frontend_certs(args.days, hosts)
 
 
 if __name__ == "__main__":
