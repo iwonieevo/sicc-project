@@ -65,7 +65,7 @@ services:
       - --requirepass
       - ${VALKEY_PASSWORD}
     ports:
-      - "${VALKEY_EXPOSED_PORT:-6379}:6379"
+      - "${VALKEY_EXPOSED_PORT}:6379"
     volumes:
       - valkey_data:/data
     networks:
@@ -149,7 +149,7 @@ networks:
   public:
   internal:
   agent-net:
-    name: ${AGENT_NET_NAME}
+    name: agent-net
 
 volumes:
   postgres_data:

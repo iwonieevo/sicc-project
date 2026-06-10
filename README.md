@@ -31,8 +31,7 @@ cp env/.env.server-iot.example env/.env.server-iot
 | `BACKEND_EXPOSED_PORT`    | `8000`            | Host port for the backend                      |
 | `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port for the IoT server                   |
 | `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port for PostgreSQL                       |
-| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents |
-| `AGENT_LABEL`             | `sicc.role=agent` | Label applied to agent containers              |
+| `VALKEY_EXPOSED_PORT`     | `6379`            | Host port for Valkey                           |
 | `POSTGRES_DB`             | `sicc`            | Database name                                  |
 | `POSTGRES_USER`           | `admin`           | Postgres superuser name                        |
 | `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                    |
@@ -74,7 +73,6 @@ cp env/.env.server-iot.example env/.env.server-iot
 | `ARGON2_PARALLELISM`                                                  | `2`                               | Argon2id parallel worker count                                             |
 | `ARGON2_HASH_LEN`                                                     | `32`                              | Argon2id hash length in bytes                                              |
 | `ARGON2_SALT_LEN`                                                     | `16`                              | Argon2id salt length in bytes                                              |
-| `SICC_VALKEY_URL`                                                     | `redis://:changeme@valkey:6379/0` | Authenticated Valkey URL for shared infra access                           |
 | `SICC_LOGIN_IP_RATE_LIMIT`                                            | `20`                              | Login attempts allowed per client IP per window                            |
 | `SICC_LOGIN_ACCOUNT_RATE_LIMIT`                                       | `10`                              | Login attempts allowed per account per window                              |
 | `SICC_LOGIN_RATE_LIMIT_WINDOW_SECONDS`                                | `300`                             | Login rate-limit window in seconds                                         |
@@ -111,7 +109,6 @@ cp env/.env.server-iot.example env/.env.server-iot
 | ------------------------------------ | --------------------------------- | ------------------------------------------------------------------------ |
 | `DEVICE_MONITOR_INTERVAL_SECONDS`    | `15`                              | Seconds between health checks to mark inactive agents offline            |
 | `SICC_AGENT_ENROLLMENT_SECRET`       | empty                             | Secret used to verify launcher-issued agent enrollment tokens            |
-| `SICC_VALKEY_URL`                    | `redis://:changeme@valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs                    |
 | `SICC_SERVICE_IDENTITY`              | `iot-server`                      | IoT server secure-transport identity                                     |
 | `SICC_SERVICE_KEY_ID`                | empty                             | IoT server key id derived from its public key                            |
 | `SICC_SERVICE_PRIVATE_KEY_B64`       | empty                             | IoT server private Ed25519 service key                                   |

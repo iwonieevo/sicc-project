@@ -1,7 +1,7 @@
 networks:
   agent-net:
     external: true
-    name: ${AGENT_NET_NAME}
+    name: agent-net
 
 services:
   agent:
@@ -30,4 +30,4 @@ services:
       - agent-net
     restart: unless-stopped
     labels:
-      - ${AGENT_LABEL}
+      - sicc.role=agent

@@ -142,7 +142,7 @@ networks:
   public:
   internal:
   agent-net:
-    name: ${AGENT_NET_NAME}
+    name: agent-net
 
 volumes:
   postgres_data:

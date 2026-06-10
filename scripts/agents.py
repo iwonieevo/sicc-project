@@ -35,11 +35,6 @@ def load_dotenv(path=".env") -> dict:
     return env
 
 
-def get_agent_label() -> str:
-    label = load_dotenv().get("AGENT_LABEL", "sicc.role=agent")
-    return label.removeprefix("label=")
-
-
 def run_cmd(cmd: list[str], env_extra: dict | None = None) -> int:
     env = os.environ.copy()
     if env_extra:
@@ -186,7 +181,7 @@ def get_agent_names(running_only=False) -> list[str]:
         "docker",
         "ps",
         "--filter",
-        f"label={get_agent_label()}",
+        "label=sicc.role=agent",
         "--format",
         "{{.Names}}",
     ]
@@ -284,14 +279,13 @@ def cmd_logs(args):
 
 
 def cmd_list(args):
-    label = get_agent_label()
     print("Running agents:")
     run_cmd(
         [
             "docker",
             "ps",
             "--filter",
-            f"label={label}",
+            "label=sicc.role=agent",
             "--format",
             "table {{.Names}}\t{{.Status}}\t{{.ID}}",
         ]
@@ -304,7 +298,7 @@ def cmd_list(args):
             "ps",
             "-a",
             "--filter",
-            f"label={label}",
+            "label=sicc.role=agent",
             "--filter",
             "status=exited",
             "--format",
