@@ -7,8 +7,9 @@ from app.plaintext_security import (
     INTERNAL_FRONTEND_TOKEN,
     INTERNAL_FRONTEND_TOKEN_HEADER,
 )
+from app.rate_limit import enforce_transport_ip_rate_limit
 from app.secure_transport import initiate_backend_iot_handshake, settings
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from security import (
@@ -109,9 +110,10 @@ def create_backend_iot_handshake(_current_user: dict = Depends(get_current_user)
 
 
 @router.get("/frontend-backend/config", response_model=FrontendBackendConfigResponse)
-def get_frontend_backend_config():
+def get_frontend_backend_config(request: Request):
     """Expose backend identity metadata needed by the browser secure client."""
 
+    enforce_transport_ip_rate_limit(request, route="frontend_backend_config")
     public_key = None
     if settings.private_key is not None:
         public_key = b64encode(
@@ -134,9 +136,18 @@ def get_frontend_backend_config():
     "/frontend-backend/handshake/start",
     response_model=FrontendBackendHandshakeStartResponse,
 )
-def start_frontend_backend_handshake(request: FrontendBackendHandshakeStartRequest):
+def start_frontend_backend_handshake(
+    request: FrontendBackendHandshakeStartRequest,
+    http_request: Request,
+):
     """Start a server-authenticated encrypted session for a browser client."""
 
+    enforce_transport_ip_rate_limit(
+        http_request,
+        route="frontend_backend_handshake",
+        limit=30,
+        window_seconds=300,
+    )
     try:
         client_ephemeral_pubkey = decode_handshake_field(
             request.client_ephemeral_pubkey

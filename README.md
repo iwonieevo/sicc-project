@@ -63,19 +63,47 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ### `env/.env.backend`
 
-| Variable                          | Default                           | Description                                      |
-| --------------------------------- | --------------------------------- | ------------------------------------------------ |
-| `JWT_SECRET_KEY`                  | `changeme`                        | Secret used to sign JWTs                         |
-| `JWT_ALGORITHM`                   | `HS256`                           | JWT signing algorithm                            |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`                              | Token lifetime in minutes                        |
-| `SICC_VALKEY_URL`                 | `redis://:changeme@valkey:6379/0` | Authenticated Valkey URL for shared infra access |
-| `SICC_SERVICE_IDENTITY`           | `backend`                         | Backend secure-transport identity                |
-| `SICC_SERVICE_KEY_ID`             | empty                             | Backend key id derived from its public key       |
-| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty                             | Backend private Ed25519 service key              |
-| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`                              | Trusted public keys; must include the IoT server |
-| `SICC_IOT_SERVER_IDENTITY`        | `iot-server`                      | Expected IoT server service identity             |
-| `SICC_IOT_SERVER_KEY_ID`          | empty                             | Required IoT server public key id                |
-| `SICC_MAX_SKEW_MS`                | `30000`                           | Maximum secure-message timestamp skew            |
+| Variable                                                              | Default                           | Description                                                                |
+| --------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
+| `JWT_SECRET_KEY`                                                      | `changeme`                        | Secret used to sign JWTs                                                   |
+| `JWT_ALGORITHM`                                                       | `HS256`                           | JWT signing algorithm                                                      |
+| `JWT_ISSUER`                                                          | `sicc-backend`                    | Expected issuer claim for backend JWTs                                     |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`                                     | `30`                              | Token lifetime in minutes                                                  |
+| `ARGON2_TIME_COST`                                                    | `3`                               | Argon2id password hashing iterations                                       |
+| `ARGON2_MEMORY_COST`                                                  | `65536`                           | Argon2id memory cost in KiB                                                |
+| `ARGON2_PARALLELISM`                                                  | `2`                               | Argon2id parallel worker count                                             |
+| `ARGON2_HASH_LEN`                                                     | `32`                              | Argon2id hash length in bytes                                              |
+| `ARGON2_SALT_LEN`                                                     | `16`                              | Argon2id salt length in bytes                                              |
+| `SICC_VALKEY_URL`                                                     | `redis://:changeme@valkey:6379/0` | Authenticated Valkey URL for shared infra access                           |
+| `SICC_LOGIN_IP_RATE_LIMIT`                                            | `20`                              | Login attempts allowed per client IP per window                            |
+| `SICC_LOGIN_ACCOUNT_RATE_LIMIT`                                       | `10`                              | Login attempts allowed per account per window                              |
+| `SICC_LOGIN_RATE_LIMIT_WINDOW_SECONDS`                                | `300`                             | Login rate-limit window in seconds                                         |
+| `SICC_SIGNUP_IP_RATE_LIMIT`                                           | `10`                              | Signup attempts allowed per client IP per window                           |
+| `SICC_SIGNUP_ACCOUNT_RATE_LIMIT`                                      | `5`                               | Signup attempts allowed per account per window                             |
+| `SICC_SIGNUP_RATE_LIMIT_WINDOW_SECONDS`                               | `300`                             | Signup rate-limit window in seconds                                        |
+| `SICC_ROUTE_RATE_LIMIT`                                               | `120`                             | Default authenticated frontend route requests allowed per user per window  |
+| `SICC_ROUTE_RATE_LIMIT_WINDOW_SECONDS`                                | `60`                              | Default authenticated frontend route rate-limit window in seconds          |
+| `SICC_ROUTE_EXECUTE_RATE_LIMIT`                                       | `30`                              | Command execution requests allowed per user per window                     |
+| `SICC_ROUTE_EXECUTE_RATE_LIMIT_WINDOW_SECONDS`                        | `300`                             | Command execution rate-limit window in seconds                             |
+| `SICC_ROUTE_EXECUTE_ANY_RATE_LIMIT`                                   | `30`                              | Any-agent command execution requests allowed per user per window           |
+| `SICC_ROUTE_EXECUTE_ANY_RATE_LIMIT_WINDOW_SECONDS`                    | `300`                             | Any-agent execution rate-limit window in seconds                           |
+| `SICC_ROUTE_RESULT_RATE_LIMIT`                                        | `30`                              | Result callback requests allowed per user per window                       |
+| `SICC_ROUTE_RESULT_RATE_LIMIT_WINDOW_SECONDS`                         | `300`                             | Result callback rate-limit window in seconds                               |
+| `SICC_ROUTE_CANCEL_QUEUE_RATE_LIMIT`                                  | `30`                              | Queue cancellation requests allowed per user per window                    |
+| `SICC_ROUTE_CANCEL_QUEUE_RATE_LIMIT_WINDOW_SECONDS`                   | `300`                             | Queue cancellation rate-limit window in seconds                            |
+| `SICC_TRANSPORT_IP_RATE_LIMIT`                                        | `120`                             | Default frontend secure-transport setup requests allowed per IP per window |
+| `SICC_TRANSPORT_RATE_LIMIT_WINDOW_SECONDS`                            | `60`                              | Default frontend secure-transport rate-limit window in seconds             |
+| `SICC_TRANSPORT_FRONTEND_BACKEND_HANDSHAKE_IP_RATE_LIMIT`             | `30`                              | Frontend-backend handshakes allowed per IP per window                      |
+| `SICC_TRANSPORT_FRONTEND_BACKEND_HANDSHAKE_RATE_LIMIT_WINDOW_SECONDS` | `300`                             | Frontend-backend handshake rate-limit window in seconds                    |
+| `SICC_SERVICE_IDENTITY`                                               | `backend`                         | Backend secure-transport identity                                          |
+| `SICC_SERVICE_KEY_ID`                                                 | empty                             | Backend key id derived from its public key                                 |
+| `SICC_SERVICE_PRIVATE_KEY_B64`                                        | empty                             | Backend private Ed25519 service key                                        |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`                                       | `{}`                              | Trusted public keys; must include the IoT server                           |
+| `SICC_IOT_SERVER_IDENTITY`                                            | `iot-server`                      | Expected IoT server service identity                                       |
+| `SICC_IOT_SERVER_KEY_ID`                                              | empty                             | Required IoT server public key id                                          |
+| `SICC_MAX_SKEW_MS`                                                    | `30000`                           | Maximum secure-message timestamp skew                                      |
+
+`JWT_SECRET_KEY` must be replaced with a high-entropy value of at least 32 characters before the backend can issue or verify tokens.
 
 ### `env/.env.server-iot`
 

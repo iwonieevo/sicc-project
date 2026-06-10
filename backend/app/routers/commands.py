@@ -4,6 +4,7 @@ import os
 import httpx
 from app.auth import get_current_user
 from app.plaintext_security import require_frontend_secure_transport
+from app.rate_limit import enforce_frontend_route_rate_limit
 from app.schemas import (
     CommandResponse,
     CommandStatusResponse,
@@ -113,6 +114,7 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
 def list_devices(
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="devices", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path="/devices",
@@ -123,6 +125,7 @@ def list_devices(
 def list_commands(
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="commands", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path="/commands",
@@ -134,6 +137,12 @@ def execute_command(
     request: ExecuteCommandRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(
+        route="execute",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     response_data = forward_to_server(
         method="POST",
         path="/execute",
@@ -158,6 +167,12 @@ def execute_command_any_agent(
     request: ExecuteAnyCommandRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(
+        route="execute_any",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     devices = forward_to_server("GET", "/devices")
 
     if not isinstance(devices, list):
@@ -227,6 +242,7 @@ def get_execution_logs(
     limit: int = 50,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="logs", user_email=current_user["email"])
 
     return forward_to_server(
         method="GET",
@@ -240,6 +256,7 @@ def get_command_status(
     queue_id: int,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="status", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path=f"/status/{queue_id}",
@@ -251,6 +268,12 @@ def receive_result(
     request: ResultCallbackRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(
+        route="result",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     return forward_to_server(
         method="POST",
         path="/result",
@@ -267,6 +290,7 @@ def get_device_queue(
     """
     Get the queue for a selected device.
     """
+    enforce_frontend_route_rate_limit(route="device_queue", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path=f"/devices/{device_id}/queue",
@@ -285,6 +309,12 @@ def cancel_queue_task(
     """
     Cancel a queued command for a selected device.
     """
+    enforce_frontend_route_rate_limit(
+        route="cancel_queue",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     return forward_to_server(
         method="POST",
         path=f"/devices/{device_id}/queue/{queue_id}/cancel",

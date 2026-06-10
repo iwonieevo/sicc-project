@@ -53,6 +53,8 @@ services:
         condition: service_healthy
       iot-server:
         condition: service_started
+      valkey:
+        condition: service_started
     networks:
       - public
       - internal
