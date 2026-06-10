@@ -3,8 +3,9 @@ import os
 
 import httpx
 from app.auth import get_current_user
+from app.plaintext_security import require_frontend_secure_transport
+from app.rate_limit import enforce_frontend_route_rate_limit
 from app.schemas import (
-    CommandCreateRequest,
     CommandResponse,
     CommandStatusResponse,
     DeviceResponse,
@@ -28,7 +29,11 @@ from security import CryptoError
 IOT_SERVER_URL = os.getenv("IOT_SERVER_URL", "http://iot-server:7000")
 LOGGER = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["commands"])
+router = APIRouter(
+    prefix="/api",
+    tags=["commands"],
+    dependencies=[Depends(require_frontend_secure_transport)],
+)
 client = httpx.Client(timeout=10.0)
 
 
@@ -109,6 +114,7 @@ def forward_to_server(method: str, path: str, json_data=None, params=None):
 def list_devices(
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="devices", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path="/devices",
@@ -119,6 +125,7 @@ def list_devices(
 def list_commands(
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="commands", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path="/commands",
@@ -130,6 +137,12 @@ def execute_command(
     request: ExecuteCommandRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(
+        route="execute",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     response_data = forward_to_server(
         method="POST",
         path="/execute",
@@ -154,12 +167,20 @@ def execute_command_any_agent(
     request: ExecuteAnyCommandRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(
+        route="execute_any",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     devices = forward_to_server("GET", "/devices")
 
     if not isinstance(devices, list):
         raise HTTPException(status_code=404, detail="No devices found")
 
-    available_devices = [device for device in devices if device["status"] in ("online", "busy")]
+    available_devices = [
+        device for device in devices if device["status"] in ("online", "busy")
+    ]
 
     if not available_devices:
         raise HTTPException(status_code=404, detail="No available agents")
@@ -173,9 +194,14 @@ def execute_command_any_agent(
         )
 
         if not isinstance(queue, list):
-            raise HTTPException(status_code=500, detail=f"Error recovering queue for device_id{device['id']}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error recovering queue for device_id{device['id']}",
+            )
 
-        active_count = sum(1 for item in queue if item["status"] in ("queued", "running"))
+        active_count = sum(
+            1 for item in queue if item["status"] in ("queued", "running")
+        )
 
         device_loads.append(
             {
@@ -199,7 +225,9 @@ def execute_command_any_agent(
     )
 
     if not response_data:
-        raise HTTPException(status_code=502, detail="IoT server did not return a response")
+        raise HTTPException(
+            status_code=502, detail="IoT server did not return a response"
+        )
 
     queue_id = response_data["queue_id"]
 
@@ -214,6 +242,7 @@ def get_execution_logs(
     limit: int = 50,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="logs", user_email=current_user["email"])
 
     return forward_to_server(
         method="GET",
@@ -227,21 +256,10 @@ def get_command_status(
     queue_id: int,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(route="status", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path=f"/status/{queue_id}",
-    )
-
-
-@router.post("/commands", response_model=CommandResponse)
-def create_command(
-    request: CommandCreateRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    return forward_to_server(
-        method="POST",
-        path="/commands",
-        json_data=model_to_dict(request),
     )
 
 
@@ -250,6 +268,12 @@ def receive_result(
     request: ResultCallbackRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    enforce_frontend_route_rate_limit(
+        route="result",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     return forward_to_server(
         method="POST",
         path="/result",
@@ -266,6 +290,7 @@ def get_device_queue(
     """
     Get the queue for a selected device.
     """
+    enforce_frontend_route_rate_limit(route="device_queue", user_email=current_user["email"])
     return forward_to_server(
         method="GET",
         path=f"/devices/{device_id}/queue",
@@ -284,6 +309,12 @@ def cancel_queue_task(
     """
     Cancel a queued command for a selected device.
     """
+    enforce_frontend_route_rate_limit(
+        route="cancel_queue",
+        user_email=current_user["email"],
+        limit=30,
+        window_seconds=300,
+    )
     return forward_to_server(
         method="POST",
         path=f"/devices/{device_id}/queue/{queue_id}/cancel",

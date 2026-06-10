@@ -10,6 +10,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 import httpx
 
 from security import (
+    ROLE_AGENT_ENROLLMENT,
     ROLE_AGENT_IOT,
     CryptoError,
     Direction,
@@ -151,6 +152,50 @@ class SecureAgentTransport:
 
         return payload
 
+    def enroll_registration(self) -> tuple[int, Any]:
+        """Register the agent through a server-authenticated encrypted enrollment session."""
+
+        session = self._initiate_enrollment_handshake()
+        with session.lock:
+            seq = session.replay.state_for(
+                Direction.CLIENT_TO_SERVER
+            ).allocate_send_seq()
+            request_envelope = encrypt_envelope(
+                {
+                    "method": "POST",
+                    "path": "/agent/register",
+                    "json": self.registration_payload(),
+                    "params": None,
+                },
+                session.keys,
+                session.transcript.protocol_version,
+                session.transcript.session_id,
+                Direction.CLIENT_TO_SERVER,
+                seq=seq,
+            )
+            response = self.client.post(
+                self._iot_url("/secure/agent-enrollment/request"),
+                json=request_envelope.to_dict(),
+            )
+            response.raise_for_status()
+
+            response_envelope = SecureEnvelope.from_dict(response.json())
+            session.replay.state_for(Direction.SERVER_TO_CLIENT).accept_recv_seq(
+                response_envelope.seq
+            )
+            response_body = decrypt_envelope(
+                response_envelope,
+                session.keys,
+                session.transcript.protocol_version,
+                Direction.SERVER_TO_CLIENT,
+                max_skew_ms=self.settings.max_skew_ms,
+            )
+
+        status_code = response_body.get("status_code")
+        if not isinstance(status_code, int) or isinstance(status_code, bool):
+            raise ValueError("secure enrollment response missing status_code")
+        return status_code, response_body.get("body")
+
     def request(
         self,
         method: str,
@@ -277,6 +322,37 @@ class SecureAgentTransport:
             "Established agent-IoT secure session %s", session.transcript.session_id
         )
         return session
+
+    def _initiate_enrollment_handshake(self) -> SecureSession:
+        server_key_id = self._select_iot_server_key_id()
+        start, client_ephemeral = create_handshake_start(
+            self.settings,
+            role=ROLE_AGENT_ENROLLMENT,
+            server_identity=self.config.iot_server_identity,
+            server_key_id=server_key_id,
+        )
+
+        start_response = self.client.post(
+            self._iot_url("/secure/agent-enrollment/handshake/start"),
+            json=self._start_to_payload(start),
+        )
+        start_response.raise_for_status()
+        data = start_response.json()
+        self._validate_start_response(start, data)
+
+        client_handshake = complete_client_handshake(
+            self.settings,
+            start,
+            client_ephemeral,
+            server_ephemeral_pubkey=decode_handshake_field(
+                data["server_ephemeral_pubkey"]
+            ),
+            server_signature=decode_handshake_field(data["server_signature"]),
+        )
+        return SecureSession(
+            transcript=client_handshake.transcript,
+            keys=client_handshake.keys,
+        )
 
     def _select_iot_server_key_id(self) -> str:
         if self.config.iot_server_key_id:
@@ -467,12 +543,22 @@ class Agent:
         """Registers the agent synchronously with exponential backoff."""
         for attempt in range(1, self.config.registration_retries + 1):
             try:
-                response = self.client.post(
-                    f"{self.config.iot_server_url}/agent/register",
-                    json=self.secure_transport.registration_payload(),
-                )
-                response.raise_for_status()
-                self.device_id = response.json()["device_id"]
+                if self.secure_transport.enabled:
+                    status_code, body = self.secure_transport.enroll_registration()
+                    if status_code >= 400:
+                        raise RuntimeError(
+                            f"secure enrollment failed with status {status_code}: {body}"
+                        )
+                    response_data = body
+                else:
+                    response = self.client.post(
+                        f"{self.config.iot_server_url}/agent/register",
+                        json=self.secure_transport.registration_payload(),
+                    )
+                    response.raise_for_status()
+                    response_data = response.json()
+
+                self.device_id = response_data["device_id"]
                 return True
             except Exception as e:
                 LOGGER.warning(f"Registration attempt {attempt} failed: {e}")

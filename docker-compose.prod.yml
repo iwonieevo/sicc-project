@@ -1,15 +1,20 @@
 services:
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: prod
+      secrets:
+        - frontend_env
     ports:
       - "${FRONTEND_EXPOSED_PORT}:3000"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    env_file:
-      - env/.env.frontend
+      - type: bind
+        source: ./frontend/certs
+        target: /run/secrets/frontend-certs
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
-      - CHOKIDAR_USEPOLLING=true
       - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
@@ -20,11 +25,10 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: prod
     ports:
       - "${BACKEND_EXPOSED_PORT}:8000"
     volumes:
-      - ./backend:/app
-      - ./security:/app/security:ro
       - type: bind
         source: ./db/certs
         target: /run/secrets/db-certs
@@ -41,12 +45,15 @@ services:
       - DB_BACKEND_PASSWORD=${DB_BACKEND_PASSWORD}
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
+      - SICC_VALKEY_URL=redis://:${VALKEY_PASSWORD}@valkey:6379/0
       - IOT_SERVER_URL=http://iot-server:7000
-      - SECURE_MODE=${SECURE_MODE:-false}
+      - SECURE_MODE=true
     depends_on:
       db:
         condition: service_healthy
       iot-server:
+        condition: service_started
+      valkey:
         condition: service_started
     networks:
       - public
@@ -54,8 +61,10 @@ services:
 
   valkey:
     image: valkey/valkey:9.1.0
-    ports:
-      - "${VALKEY_EXPOSED_PORT:-6379}:6379"
+    command:
+      - valkey-server
+      - --requirepass
+      - ${VALKEY_PASSWORD}
     volumes:
       - valkey_data:/data
     networks:
@@ -65,11 +74,8 @@ services:
     build:
       context: .
       dockerfile: server-iot/Dockerfile
-    ports:
-      - "${IOT_SERVER_EXPOSED_PORT}:7000"
+      target: prod
     volumes:
-      - ./server-iot:/app
-      - ./security:/app/security:ro
       - type: bind
         source: ./db/certs
         target: /run/secrets/db-certs
@@ -86,8 +92,8 @@ services:
       - DB_IOT_PASSWORD=${DB_IOT_PASSWORD}
       - DB_SSLMODE=verify-full
       - DB_SSLROOTCERT=/run/secrets/db-certs/ca.crt
-      - SICC_VALKEY_URL=redis://valkey:6379/0
-      - SECURE_MODE=${SECURE_MODE:-false}
+      - SICC_VALKEY_URL=redis://:${VALKEY_PASSWORD}@valkey:6379/0
+      - SECURE_MODE=true
     depends_on:
       db:
         condition: service_healthy
@@ -99,8 +105,6 @@ services:
 
   db:
     build: ./db
-    ports:
-      - "${POSTGRES_EXPOSED_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - type: bind
@@ -143,3 +147,7 @@ networks:
 volumes:
   postgres_data:
   valkey_data:
+
+secrets:
+  frontend_env:
+    file: env/.env.frontend

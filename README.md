@@ -25,20 +25,20 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ### `.env`
 
-| Variable                  | Default           | Description                                        |
-| ------------------------- | ----------------- | -------------------------------------------------- |
-| `FRONTEND_EXPOSED_PORT`   | `3000`            | Host port for the frontend                         |
-| `BACKEND_EXPOSED_PORT`    | `8000`            | Host port for the backend                          |
-| `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port for the IoT server                       |
-| `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port for PostgreSQL                           |
-| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents     |
-| `AGENT_LABEL`             | `sicc.role=agent` | Label applied to agent containers                  |
-| `POSTGRES_DB`             | `sicc`            | Database name                                      |
-| `POSTGRES_USER`           | `admin`           | Postgres superuser name                            |
-| `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                        |
-| `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service                |
-| `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server                     |
-| `ENV`                     | `development`     | Runtime environment (`development` / `production`) |
+| Variable                  | Default           | Description                                    |
+| ------------------------- | ----------------- | ---------------------------------------------- |
+| `FRONTEND_EXPOSED_PORT`   | `3000`            | Host port for the frontend                     |
+| `BACKEND_EXPOSED_PORT`    | `8000`            | Host port for the backend                      |
+| `IOT_SERVER_EXPOSED_PORT` | `7000`            | Host port for the IoT server                   |
+| `POSTGRES_EXPOSED_PORT`   | `5432`            | Host port for PostgreSQL                       |
+| `AGENT_NET_NAME`          | `sicc-agent-net`  | Docker network shared between infra and agents |
+| `AGENT_LABEL`             | `sicc.role=agent` | Label applied to agent containers              |
+| `POSTGRES_DB`             | `sicc`            | Database name                                  |
+| `POSTGRES_USER`           | `admin`           | Postgres superuser name                        |
+| `POSTGRES_PASSWORD`       | `changeme`        | Postgres superuser password                    |
+| `DB_BACKEND_PASSWORD`     | `changeme`        | DB password for the backend service            |
+| `DB_IOT_PASSWORD`         | `changeme`        | DB password for the IoT server                 |
+| `VALKEY_PASSWORD`         | `changeme`        | Valkey password required by infra services     |
 
 ### `env/.env.agent`
 
@@ -63,31 +63,61 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ### `env/.env.backend`
 
-| Variable                          | Default      | Description                                      |
-| --------------------------------- | ------------ | ------------------------------------------------ |
-| `JWT_SECRET_KEY`                  | `changeme`   | Secret used to sign JWTs                         |
-| `JWT_ALGORITHM`                   | `HS256`      | JWT signing algorithm                            |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30`         | Token lifetime in minutes                        |
-| `SICC_SERVICE_IDENTITY`           | `backend`    | Backend secure-transport identity                |
-| `SICC_SERVICE_KEY_ID`             | empty        | Backend key id derived from its public key       |
-| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty        | Backend private Ed25519 service key              |
-| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`         | Trusted public keys; must include the IoT server |
-| `SICC_IOT_SERVER_IDENTITY`        | `iot-server` | Expected IoT server service identity             |
-| `SICC_IOT_SERVER_KEY_ID`          | empty        | Required IoT server public key id                |
-| `SICC_MAX_SKEW_MS`                | `30000`      | Maximum secure-message timestamp skew            |
+| Variable                                                              | Default                           | Description                                                                |
+| --------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
+| `JWT_SECRET_KEY`                                                      | `changeme`                        | Secret used to sign JWTs                                                   |
+| `JWT_ALGORITHM`                                                       | `HS256`                           | JWT signing algorithm                                                      |
+| `JWT_ISSUER`                                                          | `sicc-backend`                    | Expected issuer claim for backend JWTs                                     |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`                                     | `30`                              | Token lifetime in minutes                                                  |
+| `ARGON2_TIME_COST`                                                    | `3`                               | Argon2id password hashing iterations                                       |
+| `ARGON2_MEMORY_COST`                                                  | `65536`                           | Argon2id memory cost in KiB                                                |
+| `ARGON2_PARALLELISM`                                                  | `2`                               | Argon2id parallel worker count                                             |
+| `ARGON2_HASH_LEN`                                                     | `32`                              | Argon2id hash length in bytes                                              |
+| `ARGON2_SALT_LEN`                                                     | `16`                              | Argon2id salt length in bytes                                              |
+| `SICC_VALKEY_URL`                                                     | `redis://:changeme@valkey:6379/0` | Authenticated Valkey URL for shared infra access                           |
+| `SICC_LOGIN_IP_RATE_LIMIT`                                            | `20`                              | Login attempts allowed per client IP per window                            |
+| `SICC_LOGIN_ACCOUNT_RATE_LIMIT`                                       | `10`                              | Login attempts allowed per account per window                              |
+| `SICC_LOGIN_RATE_LIMIT_WINDOW_SECONDS`                                | `300`                             | Login rate-limit window in seconds                                         |
+| `SICC_SIGNUP_IP_RATE_LIMIT`                                           | `10`                              | Signup attempts allowed per client IP per window                           |
+| `SICC_SIGNUP_ACCOUNT_RATE_LIMIT`                                      | `5`                               | Signup attempts allowed per account per window                             |
+| `SICC_SIGNUP_RATE_LIMIT_WINDOW_SECONDS`                               | `300`                             | Signup rate-limit window in seconds                                        |
+| `SICC_ROUTE_RATE_LIMIT`                                               | `120`                             | Default authenticated frontend route requests allowed per user per window  |
+| `SICC_ROUTE_RATE_LIMIT_WINDOW_SECONDS`                                | `60`                              | Default authenticated frontend route rate-limit window in seconds          |
+| `SICC_ROUTE_EXECUTE_RATE_LIMIT`                                       | `30`                              | Command execution requests allowed per user per window                     |
+| `SICC_ROUTE_EXECUTE_RATE_LIMIT_WINDOW_SECONDS`                        | `300`                             | Command execution rate-limit window in seconds                             |
+| `SICC_ROUTE_EXECUTE_ANY_RATE_LIMIT`                                   | `30`                              | Any-agent command execution requests allowed per user per window           |
+| `SICC_ROUTE_EXECUTE_ANY_RATE_LIMIT_WINDOW_SECONDS`                    | `300`                             | Any-agent execution rate-limit window in seconds                           |
+| `SICC_ROUTE_RESULT_RATE_LIMIT`                                        | `30`                              | Result callback requests allowed per user per window                       |
+| `SICC_ROUTE_RESULT_RATE_LIMIT_WINDOW_SECONDS`                         | `300`                             | Result callback rate-limit window in seconds                               |
+| `SICC_ROUTE_CANCEL_QUEUE_RATE_LIMIT`                                  | `30`                              | Queue cancellation requests allowed per user per window                    |
+| `SICC_ROUTE_CANCEL_QUEUE_RATE_LIMIT_WINDOW_SECONDS`                   | `300`                             | Queue cancellation rate-limit window in seconds                            |
+| `SICC_TRANSPORT_IP_RATE_LIMIT`                                        | `120`                             | Default frontend secure-transport setup requests allowed per IP per window |
+| `SICC_TRANSPORT_RATE_LIMIT_WINDOW_SECONDS`                            | `60`                              | Default frontend secure-transport rate-limit window in seconds             |
+| `SICC_TRANSPORT_FRONTEND_BACKEND_HANDSHAKE_IP_RATE_LIMIT`             | `30`                              | Frontend-backend handshakes allowed per IP per window                      |
+| `SICC_TRANSPORT_FRONTEND_BACKEND_HANDSHAKE_RATE_LIMIT_WINDOW_SECONDS` | `300`                             | Frontend-backend handshake rate-limit window in seconds                    |
+| `SICC_SERVICE_IDENTITY`                                               | `backend`                         | Backend secure-transport identity                                          |
+| `SICC_SERVICE_KEY_ID`                                                 | empty                             | Backend key id derived from its public key                                 |
+| `SICC_SERVICE_PRIVATE_KEY_B64`                                        | empty                             | Backend private Ed25519 service key                                        |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`                                       | `{}`                              | Trusted public keys; must include the IoT server                           |
+| `SICC_IOT_SERVER_IDENTITY`                                            | `iot-server`                      | Expected IoT server service identity                                       |
+| `SICC_IOT_SERVER_KEY_ID`                                              | empty                             | Required IoT server public key id                                          |
+| `SICC_MAX_SKEW_MS`                                                    | `30000`                           | Maximum secure-message timestamp skew                                      |
+
+`JWT_SECRET_KEY` must be replaced with a high-entropy value of at least 32 characters before the backend can issue or verify tokens.
 
 ### `env/.env.server-iot`
 
-| Variable                          | Default                 | Description                                                   |
-| --------------------------------- | ----------------------- | ------------------------------------------------------------- |
-| `DEVICE_MONITOR_INTERVAL_SECONDS` | `15`                    | Seconds between health checks to mark inactive agents offline |
-| `SICC_AGENT_ENROLLMENT_SECRET`    | empty                   | Secret used to verify launcher-issued agent enrollment tokens |
-| `SICC_VALKEY_URL`                 | `redis://valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs         |
-| `SICC_SERVICE_IDENTITY`           | `iot-server`            | IoT server secure-transport identity                          |
-| `SICC_SERVICE_KEY_ID`             | empty                   | IoT server key id derived from its public key                 |
-| `SICC_SERVICE_PRIVATE_KEY_B64`    | empty                   | IoT server private Ed25519 service key                        |
-| `SICC_TRUSTED_PUBLIC_KEYS_JSON`   | `{}`                    | Trusted public keys; must include backend keys                |
-| `SICC_MAX_SKEW_MS`                | `30000`                 | Maximum secure-message timestamp skew                         |
+| Variable                             | Default                           | Description                                                              |
+| ------------------------------------ | --------------------------------- | ------------------------------------------------------------------------ |
+| `DEVICE_MONITOR_INTERVAL_SECONDS`    | `15`                              | Seconds between health checks to mark inactive agents offline            |
+| `SICC_AGENT_ENROLLMENT_SECRET`       | empty                             | Secret used to verify launcher-issued agent enrollment tokens            |
+| `SICC_VALKEY_URL`                    | `redis://:changeme@valkey:6379/0` | Valkey URL used to reject reused enrollment token IDs                    |
+| `SICC_SERVICE_IDENTITY`              | `iot-server`                      | IoT server secure-transport identity                                     |
+| `SICC_SERVICE_KEY_ID`                | empty                             | IoT server key id derived from its public key                            |
+| `SICC_SERVICE_PRIVATE_KEY_B64`       | empty                             | IoT server private Ed25519 service key                                   |
+| `SICC_TRUSTED_PUBLIC_KEYS_JSON`      | `{}`                              | Trusted public keys; must include backend keys                           |
+| `SICC_MAX_SKEW_MS`                   | `30000`                           | Maximum secure-message timestamp skew                                    |
+| `SICC_PENDING_HANDSHAKE_TTL_SECONDS` | `60`                              | Maximum age for pending secure handshakes and unused enrollment sessions |
 
 ---
 
@@ -95,9 +125,21 @@ cp env/.env.server-iot.example env/.env.server-iot
 
 ```bash
 python scripts/generator.py db-certs
+python scripts/generator.py frontend-certs
 ```
 
 This creates a local CA and a PostgreSQL server certificate under `db/certs/`. The script refuses to overwrite existing certificates - delete the files in `db/certs/` first if you need to regenerate them.
+
+The frontend certificate is written to `frontend/certs/` and is mounted read-only
+by the production compose file. By default it is valid for `localhost` and
+`127.0.0.1`; add extra names or addresses with repeated `--host` flags:
+
+```bash
+python scripts/generator.py frontend-certs --host localhost --host 127.0.0.1 --host your.domain.example
+```
+
+For a real public deployment, replace the generated self-signed frontend
+certificate with a certificate trusted by clients.
 
 ---
 
@@ -108,10 +150,29 @@ This creates a local CA and a PostgreSQL server certificate under `db/certs/`. T
 Infrastructure must be running before any agents are started.
 
 ```bash
-docker compose -f docker-compose.infra.yml up -d --build
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 Services started: `frontend`, `backend`, `iot-server`, `db`, `valkey`.
+
+The development compose file runs reload-enabled services and exposes PostgreSQL
+and Valkey on host ports for debugging.
+
+For production-style startup, use:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The production compose file builds the frontend before serving it over HTTPS,
+disables reload, forces `SECURE_MODE=true` for backend services, and does not
+publish PostgreSQL or Valkey host ports.
+
+Production frontend builds consume `env/.env.frontend` as a Docker BuildKit
+build secret because Vite embeds `VITE_SICC_BACKEND_*` values at build time.
+These pins are public client configuration, not secret credentials, but keeping
+them in the frontend env file avoids mixing frontend build config into root
+infrastructure settings.
 
 ### Agents
 
@@ -124,9 +185,9 @@ python scripts/agents.py start agent-alpha agent-beta agent-gamma
 
 The agent name is arbitrary — any string matching `[a-zA-Z0-9][a-zA-Z0-9_.-]+` is valid.
 
-When `SECURE_MODE=true`, `scripts/agents.py start <name>` is the trusted operator launcher. For every newly created agent container it generates:
+When `SECURE_MODE=true`, `scripts/agents.py start <name>` is the trusted operator launcher. For every newly created agent container it rebuilds the agent image and generates:
 
-- a short-lived enrollment token for that exact agent name;
+- a short-lived enrollment token for that exact agent name and generated public key id;
 - a fresh Ed25519 agent identity key;
 - the matching key id and runtime environment values.
 
@@ -186,7 +247,7 @@ python scripts/agents.py down --all
 ### Stop infrastructure
 
 ```bash
-docker compose -f docker-compose.infra.yml stop
+docker compose -f docker-compose.dev.yml stop
 ```
 
 This preserves database data and container state. Subsequent starts are instant.
@@ -196,7 +257,7 @@ This preserves database data and container state. Subsequent starts are instant.
 Removes containers and networks, but keeps database volumes:
 
 ```bash
-docker compose -f docker-compose.infra.yml down
+docker compose -f docker-compose.dev.yml down
 ```
 
 ### Full reset (destroys database)
@@ -204,7 +265,7 @@ docker compose -f docker-compose.infra.yml down
 Permanently deletes all data including the PostgreSQL volume:
 
 ```bash
-docker compose -f docker-compose.infra.yml down -v
+docker compose -f docker-compose.dev.yml down -v
 ```
 
 ---
@@ -216,14 +277,14 @@ docker compose -f docker-compose.infra.yml down -v
 All services:
 
 ```bash
-docker compose -f docker-compose.infra.yml logs -f
+docker compose -f docker-compose.dev.yml logs -f
 ```
 
 Specific service:
 
 ```bash
-docker compose -f docker-compose.infra.yml logs -f iot-server
-docker compose -f docker-compose.infra.yml logs -f backend
+docker compose -f docker-compose.dev.yml logs -f iot-server
+docker compose -f docker-compose.dev.yml logs -f backend
 ```
 
 ### Agents logs
@@ -256,7 +317,7 @@ Commands:
 
 Once running, services are available on the ports configured in `.env`:
 
-- Frontend: [http://localhost:3000](http://localhost:3000) (`FRONTEND_EXPOSED_PORT`)
+- Frontend: [https://localhost:3000](https://localhost:3000) (`FRONTEND_EXPOSED_PORT`)
 - Backend API: [http://localhost:8000](http://localhost:8000) (`BACKEND_EXPOSED_PORT`)
 - IoT Server: [http://localhost:7000](http://localhost:7000) (`IOT_SERVER_EXPOSED_PORT`)
 

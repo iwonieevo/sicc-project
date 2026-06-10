@@ -31,7 +31,9 @@ router = APIRouter()
 LOGGER = logging.getLogger(__name__)
 
 
-def require_valid_enrollment_token(token: str | None, agent_name: str) -> None:
+def require_valid_enrollment_token(
+    token: str | None, agent_name: str, public_key_id_value: str
+) -> None:
     enrollment_secret = os.getenv("SICC_AGENT_ENROLLMENT_SECRET")
     if enrollment_secret is None:
         LOGGER.warning("Secure registration rejected without enrollment secret")
@@ -48,7 +50,12 @@ def require_valid_enrollment_token(token: str | None, agent_name: str) -> None:
             status_code=403, detail="Device enrollment token is invalid"
         )
 
-    claims = verify_enrollment_token(enrollment_secret, token, agent_name)
+    claims = verify_enrollment_token(
+        enrollment_secret,
+        token,
+        agent_name,
+        public_key_id=public_key_id_value,
+    )
     if claims is None:
         LOGGER.warning(
             "Secure registration rejected for invalid enrollment token: '%s'",
@@ -113,6 +120,11 @@ def register_agent(
     secure_identity = None
     if request.headers.get(INTERNAL_AGENT_TOKEN_HEADER) is not None:
         secure_identity = require_agent_transport(request)
+    elif secure_settings.enabled:
+        raise HTTPException(
+            status_code=403,
+            detail="Agent registration requires secure enrollment transport",
+        )
     if secure_identity is not None and secure_identity != data.name:
         raise HTTPException(status_code=403, detail="Agent identity mismatch")
 
@@ -145,7 +157,11 @@ def register_agent(
         )
 
         if needs_enrollment or is_key_rotation:
-            require_valid_enrollment_token(data.enrollment_token, data.name)
+            require_valid_enrollment_token(
+                data.enrollment_token,
+                data.name,
+                public_key_id_value,
+            )
             allow_key_replacement = is_key_rotation
 
     if device:
